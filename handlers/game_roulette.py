@@ -4,6 +4,7 @@ import random
 from datetime import datetime, timedelta
 from contextlib import suppress
 import logging
+from html import escape
 
 from aiogram import Router, Bot
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
@@ -39,20 +40,19 @@ chat_cooldowns = {}
 
 
 # --- ФУНКЦИИ ИГРЫ ---
-def get_roulette_keyboard(game: GameState, user_id: int) -> InlineKeyboardMarkup:
-    buttons = [InlineKeyboardButton(text="🍺 Присоединиться", callback_data=RouletteCallbackData(action="join").pack())]
-    if user_id in game.players:
-        if user_id == game.creator.id:
-            buttons.append(InlineKeyboardButton(text="❌ Отменить игру", callback_data=RouletteCallbackData(action="cancel").pack()))
-        else:
-            buttons.append(InlineKeyboardButton(text="🚪 Выйти", callback_data=RouletteCallbackData(action="leave").pack()))
+def get_roulette_keyboard(game: GameState) -> InlineKeyboardMarkup:
+    buttons = [
+        InlineKeyboardButton(text="🍺 Присоединиться", callback_data=RouletteCallbackData(action="join").pack()),
+        InlineKeyboardButton(text="🚪 Выйти", callback_data=RouletteCallbackData(action="leave").pack()),
+        InlineKeyboardButton(text="❌ Отменить", callback_data=RouletteCallbackData(action="cancel").pack()),
+    ]
     return InlineKeyboardMarkup(inline_keyboard=[buttons])
 
 async def generate_lobby_text(game: GameState) -> str:
-    players_list = "\n".join(f"• {p.full_name}" for p in game.players.values())
+    players_list = "\n".join(f"• {escape(p.full_name)}" for p in game.players.values())
     return (
         f"🍻 <b>Пивная рулетка началась!</b> 🍻\n\n"
-        f"Создал игру: <b>{game.creator.full_name}</b>\n"
+        f"Создал игру: <b>{escape(game.creator.full_name)}</b>\n"
         f"Ставка для входа: <b>{game.stake} 🍺</b>\n"
         f"Игроки: ({len(game.players)}/{game.max_players})\n{players_list}\n\n"
         f"<i>Игра начнется через {ROULETTE_LOBBY_TIMEOUT_SECONDS} секунд или когда наберется {game.max_players} игроков.</i>"
@@ -104,7 +104,7 @@ async def cmd_roulette(message: Message, bot: Bot, db: Database, settings: Setti
     game = GameState(creator, stake, max_players, lobby_message.message_id)
     active_games[chat_id] = game
     with suppress(TelegramBadRequest): await bot.pin_chat_message(chat_id=chat_id, message_id=lobby_message.message_id, disable_notification=True)
-    await lobby_message.edit_text(await generate_lobby_text(game), reply_markup=get_roulette_keyboard(game, creator.id), parse_mode='HTML')
+    await lobby_message.edit_text(await generate_lobby_text(game), reply_markup=get_roulette_keyboard(game), parse_mode='HTML')
     game.task = asyncio.create_task(schedule_game_start(chat_id, bot, db))
 
 @roulette_router.callback_query(RouletteCallbackData.filter())
@@ -129,7 +129,7 @@ async def on_roulette_button_click(callback: CallbackQuery, callback_data: Roule
             if game.task: game.task.cancel()
             await start_roulette_game(chat_id, bot, db)
         else:
-            await callback.message.edit_text(await generate_lobby_text(game), reply_markup=get_roulette_keyboard(game, user.id), parse_mode='HTML')
+            await callback.message.edit_text(await generate_lobby_text(game), reply_markup=get_roulette_keyboard(game), parse_mode='HTML')
             
     elif action == "leave":
         if user.id not in game.players: return await callback.answer("Вы не в этой игре.", show_alert=True)
@@ -137,7 +137,7 @@ async def on_roulette_button_click(callback: CallbackQuery, callback_data: Roule
         del game.players[user.id]
         await db.change_rating(user.id, game.stake)
         await callback.answer("Вы покинули игру, ваша ставка возвращена.", show_alert=True)
-        await callback.message.edit_text(await generate_lobby_text(game), reply_markup=get_roulette_keyboard(game, user.id), parse_mode='HTML')
+        await callback.message.edit_text(await generate_lobby_text(game), reply_markup=get_roulette_keyboard(game), parse_mode='HTML')
         
     elif action == "cancel":
         if user.id != game.creator.id: return await callback.answer("Только создатель может отменить игру.", show_alert=True)
@@ -181,10 +181,10 @@ async def start_roulette_game(chat_id: int, bot: Bot, db: Database):
         await asyncio.sleep(5)
         loser = random.choice(players_in_game)
         players_in_game.remove(loser)
-        remaining_players_text = "\n".join(f"• {p.full_name}" for p in players_in_game)
+        remaining_players_text = "\n".join(f"• {escape(p.full_name)}" for p in players_in_game)
         await bot.send_message(
             chat_id,
-            text=f"Выбывает... <b>{loser.full_name}</b>! 😖\n\n"
+            text=f"Выбывает... <b>{escape(loser.full_name)}</b>! 😖\n\n"
                  f"<i>Остались в игре:</i>\n{remaining_players_text}",
             parse_mode='HTML'
         )
@@ -195,7 +195,7 @@ async def start_roulette_game(chat_id: int, bot: Bot, db: Database):
     await db.change_rating(winner.id, prize)
     winner_text = (
         f"🏆 <b>ПОБЕДИТЕЛЬ!</b> 🏆\n\n"
-        f"Поздравляем, <b>{winner.full_name}</b>! Он забирает весь банк: <b>{prize} 🍺</b>!\n\n"
+        f"Поздравляем, <b>{escape(winner.full_name)}</b>! Он забирает весь банк: <b>{prize} 🍺</b>!\n\n"
         f"<i>Игра окончена.</i>"
     )
     winner_message = await bot.send_message(chat_id, text=winner_text, parse_mode='HTML')

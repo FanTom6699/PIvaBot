@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from contextlib import suppress
 import logging
 from typing import List
+from html import escape
 
 from aiogram import Router, F, Bot
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, User, Chat
@@ -141,7 +142,7 @@ async def end_ladder_game(bot: Bot, chat_id: int, user: User, game: LadderGameSt
     )
     keyboard = InlineKeyboardMarkup(inline_keyboard=[[play_again_button]])
     
-    player_name = user.full_name
+    player_name = escape(user.full_name)
     rewards = calculate_ladder_rewards(game.stake)
     
     if is_win:
@@ -236,15 +237,15 @@ async def cmd_ladder(message: Message, bot: Bot, db: Database, settings: Setting
 
 @ladder_router.callback_query(LadderCallbackData.filter(F.action == "play_again"))
 async def on_ladder_play_again(callback: CallbackQuery, callback_data: LadderCallbackData, bot: Bot, db: Database):
-    await callback.answer()
     stake = callback_data.stake
-    
+
     if callback.message.chat.id in active_ladder_games:
-        return await callback.message.answer("Пожалуйста, подождите, пока текущая игра в 'Лесенку' в этом чате не закончится.", show_alert=True)
+        return await callback.answer("Пожалуйста, подождите, пока текущая игра в 'Лесенку' в этом чате не закончится.", show_alert=True)
+    await callback.answer()
     balance = await db.get_user_beer_rating(callback.from_user.id)
     if balance < stake:
          return await callback.message.answer(f"Недостаточно пива для новой игры! Нужно {stake} 🍺, у вас {balance} 🍺.")
-    
+
     await callback.message.delete()
     await start_ladder_game(callback.message.chat, callback.from_user, bot, stake, db)
 
@@ -295,3 +296,8 @@ async def on_ladder_game_callback(callback: CallbackQuery, callback_data: Ladder
         else:
             game.last_choice = choice
             await end_ladder_game(bot, chat_id, user, game, is_win=False, db=db)
+
+
+@ladder_router.callback_query(F.data == "do_nothing")
+async def on_ladder_inactive_button(callback: CallbackQuery):
+    await callback.answer()
