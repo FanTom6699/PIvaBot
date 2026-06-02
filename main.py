@@ -11,7 +11,6 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 from handlers import main_router
-from handlers.game_raid import raid_background_updater, active_raid_tasks
 
 from database import Database
 from settings import SettingsManager
@@ -25,26 +24,6 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 DB_NAME = os.getenv("DB_NAME", "bot_database.db")
 if not BOT_TOKEN:
     raise RuntimeError("❌ BOT_TOKEN не найден. Проверь файл .env")
-
-
-# ─────────────────────────────────────────────
-# Запуск активных рейдов при старте
-# ─────────────────────────────────────────────
-async def start_active_raid_tasks(bot: Bot, db: Database, settings: SettingsManager):
-    logging.info("Проверка активных рейдов...")
-    active_raids = await db.get_all_active_raids()
-    count = 0
-
-    for raid in active_raids:
-        chat_id = raid[0]
-        if chat_id not in active_raid_tasks:
-            task = asyncio.create_task(
-                raid_background_updater(chat_id, bot, db, settings)
-            )
-            active_raid_tasks[chat_id] = task
-            count += 1
-
-    logging.info(f"Запущено {count} фоновых задач для активных рейдов.")
 
 
 # ─────────────────────────────────────────────
@@ -133,7 +112,6 @@ async def main():
     dp.include_router(main_router)
 
     # Фоновые задачи
-    await start_active_raid_tasks(bot, db, settings_manager)
     asyncio.create_task(farm_background_updater(bot, db))
 
     logging.info("🚀 Бот запущен (polling)")

@@ -31,21 +31,6 @@ class Database:
             ''')
             await db.execute('CREATE TABLE IF NOT EXISTS chats (chat_id INTEGER PRIMARY KEY, title TEXT)')
             await db.execute('CREATE TABLE IF NOT EXISTS game_data (key TEXT PRIMARY KEY, value INTEGER)')
-            
-            # --- ТАБЛИЦЫ РЕЙДОВ ---
-            await db.execute('''
-                CREATE TABLE IF NOT EXISTS active_raids (
-                    chat_id INTEGER PRIMARY KEY, message_id INTEGER, boss_health INTEGER,
-                    boss_max_health INTEGER, reward_pool INTEGER, end_time TEXT
-                )
-            ''')
-            await db.execute('''
-                CREATE TABLE IF NOT EXISTS raid_participants (
-                    raid_id INTEGER, user_id INTEGER, damage_dealt INTEGER DEFAULT 0,
-                    last_hit_time TEXT, PRIMARY KEY (raid_id, user_id)
-                )
-            ''')
-            
             # --- ТАБЛИЦЫ ФЕРМЫ ---
             await db.execute('''
                 CREATE TABLE IF NOT EXISTS user_farm_data (
@@ -132,11 +117,6 @@ class Database:
                 ('beer_cooldown', 7200), ('jackpot_chance', 100),
                 ('roulette_cooldown', 300), ('roulette_min_bet', 10), ('roulette_max_bet', 1000),
                 ('ladder_min_bet', 10), ('ladder_max_bet', 500),
-                ('raid_boss_health', 1000), ('raid_reward_pool', 5000),
-                ('raid_duration_hours', 24), ('raid_hit_cooldown_minutes', 0),
-                ('raid_strong_hit_cost', 50), ('raid_strong_hit_damage_min', 30), ('raid_strong_hit_damage_max', 60),
-                ('raid_normal_hit_damage_min', 10), ('raid_normal_hit_damage_max', 20),
-                ('raid_reminder_hours', 4),
                 ('mafia_min_players', 4), ('mafia_max_players', 12),
                 ('mafia_lobby_timer', 60), ('mafia_night_timer', 60),
                 ('mafia_day_timer', 120), ('mafia_vote_timer', 60),
@@ -316,66 +296,6 @@ class Database:
     async def increase_jackpot(self, amount: int):
         current = await self.get_jackpot()
         await self.update_setting("jackpot_value", current + amount)
-        
-    # --- 👹 РЕЙДЫ (ВОССТАНОВЛЕНЫ) ---
-
-    async def get_all_active_raids(self):
-        """Возвращает список chat_id активных рейдов."""
-        async with aiosqlite.connect(self.db_name) as db:
-            cursor = await db.execute("SELECT chat_id FROM active_raids")
-            return await cursor.fetchall()
-
-    async def get_active_raid(self, chat_id: int):
-        async with aiosqlite.connect(self.db_name) as db:
-            db.row_factory = aiosqlite.Row
-            cursor = await db.execute("SELECT * FROM active_raids WHERE chat_id = ?", (chat_id,))
-            row = await cursor.fetchone()
-            return dict(row) if row else None
-
-    async def create_raid(self, chat_id: int, message_id: int, boss_health: int, max_health: int, reward: int, end_time: datetime):
-        async with aiosqlite.connect(self.db_name) as db:
-            await db.execute(
-                "INSERT OR REPLACE INTO active_raids (chat_id, message_id, boss_health, boss_max_health, reward_pool, end_time) VALUES (?, ?, ?, ?, ?, ?)",
-                (chat_id, message_id, boss_health, max_health, reward, end_time.isoformat())
-            )
-            await db.commit()
-
-    async def update_raid_health(self, chat_id: int, damage: int):
-        async with aiosqlite.connect(self.db_name) as db:
-            await db.execute("UPDATE active_raids SET boss_health = boss_health - ? WHERE chat_id = ?", (damage, chat_id))
-            await db.commit()
-
-    async def end_raid(self, chat_id: int):
-        async with aiosqlite.connect(self.db_name) as db:
-            await db.execute("DELETE FROM active_raids WHERE chat_id = ?", (chat_id,))
-            await db.execute("DELETE FROM raid_participants WHERE raid_id = ?", (chat_id,))
-            await db.commit()
-
-    async def add_raid_participant(self, chat_id: int, user_id: int, damage: int):
-        now = datetime.now().isoformat()
-        async with aiosqlite.connect(self.db_name) as db:
-            await db.execute("""
-                INSERT INTO raid_participants (raid_id, user_id, damage_dealt, last_hit_time)
-                VALUES (?, ?, ?, ?)
-                ON CONFLICT(raid_id, user_id) DO UPDATE SET
-                damage_dealt = damage_dealt + excluded.damage_dealt,
-                last_hit_time = excluded.last_hit_time
-            """, (chat_id, user_id, damage, now))
-            await db.commit()
-            
-    async def get_raid_participants(self, chat_id: int):
-        async with aiosqlite.connect(self.db_name) as db:
-            cursor = await db.execute("SELECT user_id, damage_dealt FROM raid_participants WHERE raid_id = ?", (chat_id,))
-            return await cursor.fetchall()
-
-    async def get_raid_participant(self, chat_id: int, user_id: int):
-        async with aiosqlite.connect(self.db_name) as db:
-            cursor = await db.execute(
-                "SELECT raid_id, user_id, damage_dealt, last_hit_time FROM raid_participants WHERE raid_id = ? AND user_id = ?",
-                (chat_id, user_id)
-            )
-            return await cursor.fetchone()
-            
     # --- 🕵️ МАФИЯ (ВОССТАНОВЛЕНЫ) ---
     
     async def get_mafia_game(self, chat_id: int):

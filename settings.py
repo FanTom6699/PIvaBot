@@ -12,18 +12,6 @@ SETTINGS_NAMES = {
     "roulette_max_bet": "Макс. ставка Рулетки",
     "ladder_min_bet": "Мин. ставка Лесенки",
     "ladder_max_bet": "Макс. ставка Лесенки",
-    
-    # Рейд
-    "raid_boss_health": "HP Босса",
-    "raid_reward_pool": "Награда за Босса",
-    "raid_duration_hours": "Длительность Рейда (ч)",
-    "raid_hit_cooldown_minutes": "Кулдаун удара (мин)",
-    "raid_strong_hit_cost": "Цена сильного удара",
-    "raid_strong_hit_damage_min": "Урон сильн. (мин)",
-    "raid_strong_hit_damage_max": "Урон сильн. (макс)",
-    "raid_normal_hit_damage_min": "Урон обычн. (мин)",
-    "raid_normal_hit_damage_max": "Урон обычн. (макс)",
-    "raid_reminder_hours": "Напоминание (ч)",
 }
 
 class SettingsManager:
@@ -38,18 +26,6 @@ class SettingsManager:
         self.roulette_max_bet = 1000
         self.ladder_min_bet = 10
         self.ladder_max_bet = 500
-        
-        # Рейд
-        self.raid_boss_health = 1000
-        self.raid_reward_pool = 5000
-        self.raid_duration_hours = 24
-        self.raid_hit_cooldown_minutes = 0
-        self.raid_strong_hit_cost = 50
-        self.raid_strong_hit_damage_min = 30
-        self.raid_strong_hit_damage_max = 60
-        self.raid_normal_hit_damage_min = 10
-        self.raid_normal_hit_damage_max = 20
-        self.raid_reminder_hours = 4
 
     async def load_settings(self, db: Database):
         """Загружает все настройки из БД, обновляя дефолтные."""
@@ -84,19 +60,6 @@ class SettingsManager:
             "beer_cooldown", "jackpot_chance", 
             "roulette_cooldown", "roulette_min_bet", "roulette_max_bet",
             "ladder_min_bet", "ladder_max_bet"
-        ]
-        for key in keys:
-            text += self._format_setting_line(key)
-        return text
-
-    def get_raid_settings_text(self) -> str:
-        """Возвращает текст настроек Рейда."""
-        text = "\n<b>👹 Рейд:</b>\n"
-        keys = [
-            "raid_boss_health", "raid_reward_pool", "raid_duration_hours", 
-            "raid_hit_cooldown_minutes", "raid_reminder_hours",
-            "raid_strong_hit_cost", "raid_strong_hit_damage_min", "raid_strong_hit_damage_max",
-            "raid_normal_hit_damage_min", "raid_normal_hit_damage_max"
         ]
         for key in keys:
             text += self._format_setting_line(key)
