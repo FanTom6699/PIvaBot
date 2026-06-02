@@ -1,4 +1,5 @@
 # handlers/common.py
+from datetime import datetime, timedelta
 from html import escape
 
 from aiogram import Router, F, Bot
@@ -6,6 +7,9 @@ from aiogram.types import Message, CallbackQuery, ChatMemberUpdated, InlineKeybo
 from aiogram.filters import CommandStart, Command
 from aiogram.filters.callback_data import CallbackData
 from database import Database
+from settings import SettingsManager
+from .beer_service import run_beer_attempt
+from utils import format_time_delta
 
 common_router = Router()
 
@@ -51,17 +55,63 @@ def get_private_start_text(user_name: str, is_new: bool) -> str:
     )
 
 
-async def get_profile_text(user_id: int, user_name: str, db: Database) -> str:
+async def get_profile_text(user_id: int, user_name: str, db: Database, settings: SettingsManager | None = None) -> str:
     user_name = escape(user_name)
     profile = await db.get_user_profile(user_id)
     rating = profile[3] if profile else 0
     rank = await db.get_user_rank(user_id)
     rank_text = f"#{rank['rank']}" if rank else "—"
+    farm = await db.get_user_farm_data(user_id)
+    inventory = await db.get_user_inventory(user_id)
+    last_beer_time = await db.get_last_beer_time(user_id)
+    beer_status = "готово"
+    if last_beer_time and settings:
+        time_passed = datetime.now() - last_beer_time
+        if time_passed.total_seconds() < settings.beer_cooldown:
+            time_left = timedelta(seconds=settings.beer_cooldown) - time_passed
+            beer_status = f"через {format_time_delta(time_left)}"
+
     return (
-        f"🍺 <b>{user_name}</b>\n\n"
+        f"👤 <b>Профиль</b>\n\n"
+        f"<b>{user_name}</b>\n"
+        f"Статус: {get_rating_title(rating)}\n"
         f"Рейтинг: {rating} 🍺\n"
-        f"Место: {rank_text}"
+        f"Место: {rank_text}\n\n"
+        f"🍺 Выпить: {beer_status}\n\n"
+        f"🌾 <b>Ферма</b>\n"
+        f"Поле: ур. {farm.get('field_level', 1)}\n"
+        f"Пивоварня: ур. {farm.get('brewery_level', 1)}\n"
+        f"Склад: {inventory.get('зерно', 0)} 🌾 / {inventory.get('хмель', 0)} 🌱"
     )
+
+
+def get_rating_title(rating: int) -> str:
+    status = "🧐 Новичок"
+    if rating >= 100: status = "🍻 Выпивоха"
+    if rating >= 300: status = "🎩 Завсегдатай"
+    if rating >= 750: status = "😎 Свой в доску"
+    if rating >= 1500: status = "💪 Синяк"
+    if rating >= 3000: status = " V.I.P."
+    if rating >= 5000: status = "🍾 Сомелье"
+    if rating >= 7500: status = "🎗 Ветеран Бара"
+    if rating >= 10000: status = "🌟 Легенда Бара"
+    if rating >= 15000: status = "🎖 Элита"
+    if rating >= 20000: status = "🏆 Чемпион"
+    if rating >= 30000: status = "💎 Алмазный Алконафт"
+    if rating >= 40000: status = "🌀 Повелитель Пены"
+    if rating >= 50000: status = "🌌 Бог Пива"
+    if rating >= 65000: status = "🔱 Атлант"
+    if rating >= 80000: status = "🦄 Мифический"
+    if rating >= 100000: status = "🧙‍♂️ Пивной Магистр"
+    if rating >= 150000: status = "🦖 Пивозавр"
+    if rating >= 225000: status = "🤖 Барный Киборг"
+    if rating >= 300000: status = "🚀 Трижды Несокрушимый"
+    if rating >= 400000: status = "⚡️ Гроза Кранов"
+    if rating >= 500000: status = "🌪️ Лорд Хмельных Бурь"
+    if rating >= 650000: status = "👑 Император Пива"
+    if rating >= 800000: status = "🪐 Хозяин Галактики Пива"
+    if rating >= 1000000: status = "✨ Пивной Абсолют"
+    return status
 
 
 async def get_top_text(db: Database, user_id: int | None = None) -> str:
@@ -175,7 +225,7 @@ async def cmd_help(message: Message):
 
 
 @common_router.callback_query(MainMenuCallback.filter())
-async def cq_main_menu(callback: CallbackQuery, callback_data: MainMenuCallback, db: Database):
+async def cq_main_menu(callback: CallbackQuery, callback_data: MainMenuCallback, db: Database, settings: SettingsManager):
     user = callback.from_user
     await db.add_user(user.id, user.first_name, user.last_name, user.username)
 
@@ -183,7 +233,7 @@ async def cq_main_menu(callback: CallbackQuery, callback_data: MainMenuCallback,
         text = get_private_start_text(user.full_name, False)
         keyboard = get_main_menu_keyboard(user.id)
     elif callback_data.action == "profile":
-        text = await get_profile_text(user.id, user.full_name, db)
+        text = await get_profile_text(user.id, user.full_name, db, settings)
         keyboard = get_back_to_menu_keyboard()
     elif callback_data.action == "top":
         text = await get_top_text(db, user.id)
@@ -199,7 +249,13 @@ async def cq_main_menu(callback: CallbackQuery, callback_data: MainMenuCallback,
         text = get_help_text()
         keyboard = get_back_to_menu_keyboard()
     elif callback_data.action == "beer":
-        text = "Напиши /beer в личке или группе, чтобы испытать удачу."
+        result = await run_beer_attempt(user.id, db, settings)
+        if result["spam"]:
+            await callback.answer()
+            return
+        text = result["text"]
+        if result["jackpot_text"]:
+            text += f"\n\n{result['jackpot_text']}"
         keyboard = get_back_to_menu_keyboard()
     else:
         text = get_private_start_text(user.full_name, False)
