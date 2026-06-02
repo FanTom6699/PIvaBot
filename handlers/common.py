@@ -31,6 +31,12 @@ def get_main_menu_keyboard(user_id: int) -> InlineKeyboardMarkup:
     ])
 
 
+def get_back_to_menu_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="⬅️ Назад в меню", callback_data=MainMenuCallback(action="home").pack())
+    ]])
+
+
 def get_private_start_text(user_name: str, is_new: bool) -> str:
     user_name = escape(user_name)
     if is_new:
@@ -171,16 +177,22 @@ async def cq_main_menu(callback: CallbackQuery, callback_data: MainMenuCallback,
     user = callback.from_user
     await db.add_user(user.id, user.first_name, user.last_name, user.username)
 
-    if callback_data.action == "profile":
+    if callback_data.action == "home":
+        text = get_private_start_text(user.full_name, False)
+        keyboard = get_main_menu_keyboard(user.id)
+    elif callback_data.action == "profile":
         text = await get_profile_text(user.id, user.full_name, db)
+        keyboard = get_back_to_menu_keyboard()
     elif callback_data.action == "top":
         text = await get_top_text(db, user.id)
+        keyboard = get_back_to_menu_keyboard()
     elif callback_data.action == "jackpot":
         current_jackpot = await db.get_jackpot()
         text = (
             "🎁 <b>Джекпот бара</b>\n\n"
             f"В банке: {current_jackpot} 🍺"
         )
+        keyboard = get_back_to_menu_keyboard()
     elif callback_data.action == "help":
         text = (
             "❓ <b>Помощь</b>\n\n"
@@ -191,14 +203,17 @@ async def cq_main_menu(callback: CallbackQuery, callback_data: MainMenuCallback,
             "/roulette — рулетка в группе\n"
             "/ladder — лесенка"
         )
+        keyboard = get_back_to_menu_keyboard()
     elif callback_data.action == "beer":
         text = "Напиши /beer в личке или группе, чтобы испытать удачу."
+        keyboard = get_back_to_menu_keyboard()
     else:
         text = get_private_start_text(user.full_name, False)
+        keyboard = get_main_menu_keyboard(user.id)
 
     await callback.message.edit_text(
         text,
-        reply_markup=get_main_menu_keyboard(user.id),
+        reply_markup=keyboard,
         parse_mode='HTML'
     )
     await callback.answer()

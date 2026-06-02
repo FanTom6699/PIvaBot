@@ -225,7 +225,8 @@ async def get_farm_dashboard(user_id: int, user_name: str, db: Database) -> (str
         InlineKeyboardButton(text="🏪 Магазин",   callback_data=FarmCallback(action="shop",      owner_id=user_id).pack()),
         InlineKeyboardButton(text="❓ Как играть?", callback_data=FarmCallback(action="show_help", owner_id=user_id).pack())
     ]
-    kb += rows(kb_buttons, per_row=2) 
+    kb += rows(kb_buttons, per_row=2)
+    kb.append([InlineKeyboardButton(text="⬅️ Главное меню", callback_data="menu:home")])
 
     return text, InlineKeyboardMarkup(inline_keyboard=kb)
 
