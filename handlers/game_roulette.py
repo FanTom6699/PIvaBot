@@ -37,6 +37,7 @@ class GameState:
 ROULETTE_LOBBY_TIMEOUT_SECONDS = 60
 active_games = {}
 chat_cooldowns = {}
+DIVIDER = "<code>--- --- ---</code>"
 
 
 # --- ФУНКЦИИ ИГРЫ ---
@@ -51,39 +52,66 @@ def get_roulette_keyboard(game: GameState) -> InlineKeyboardMarkup:
 async def generate_lobby_text(game: GameState) -> str:
     players_list = "\n".join(f"• {escape(p.full_name)}" for p in game.players.values())
     return (
-        f"🍻 <b>Пивная рулетка началась!</b> 🍻\n\n"
-        f"Создал игру: <b>{escape(game.creator.full_name)}</b>\n"
-        f"Ставка для входа: <b>{game.stake} 🍺</b>\n"
-        f"Игроки: ({len(game.players)}/{game.max_players})\n{players_list}\n\n"
-        f"<i>Игра начнется через {ROULETTE_LOBBY_TIMEOUT_SECONDS} секунд или когда наберется {game.max_players} игроков.</i>"
+        "🎰 <b>Пивная рулетка</b>\n\n"
+        "На стойке стоит общий банк. Один останется с кружкой, остальные уйдут без ставки.\n\n"
+        f"{DIVIDER}\n"
+        f"Создатель: <b>{escape(game.creator.full_name)}</b>\n"
+        f"Ставка: <b>{game.stake}</b> 🍺\n"
+        f"Игроки: <b>{len(game.players)}/{game.max_players}</b>\n\n"
+        f"{players_list}\n\n"
+        f"<i>Старт через {ROULETTE_LOBBY_TIMEOUT_SECONDS} с или при полном лобби.</i>"
+    )
+
+
+def get_roulette_help_text(settings: SettingsManager) -> str:
+    return (
+        "🎰 <b>Пивная рулетка</b>\n\n"
+        "Групповая игра на выбывание. Каждый ставит 🍺, победитель забирает весь банк.\n\n"
+        f"{DIVIDER}\n"
+        "Формат: <code>/roulette &lt;ставка&gt; &lt;игроки&gt;</code>\n"
+        f"Ставка: <b>{settings.roulette_min_bet}-{settings.roulette_max_bet}</b> 🍺\n"
+        "Игроки: <b>2-6</b>\n\n"
+        "Пример: <code>/roulette 10 4</code>"
+    )
+
+
+def get_roulette_cancel_text(reason: str) -> str:
+    return (
+        "🎰 <b>Пивная рулетка</b>\n\n"
+        f"{reason}\n\n"
+        f"{DIVIDER}\n"
+        "Все ставки возвращены."
     )
 
 @roulette_router.message(Command("roulette"))
 async def cmd_roulette(message: Message, bot: Bot, db: Database, settings: SettingsManager):
-    if message.chat.type == 'private': return await message.answer("Эта команда работает только в групповых чатах.")
+    if message.chat.type == 'private':
+        return await message.answer("🎰 <b>Пивная рулетка</b>\n\nЭта игра запускается только в группе.")
     args = message.text.split()
-    
-    # --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
+
     if len(args) != 3 or not args[1].isdigit() or not args[2].isdigit():
-        return await message.reply(
-            "ℹ️ <b>Как запустить 'Пивную рулетку':</b>\n"
-            # Было: /roulette <ставка> <игроки>
-            "Используйте команду: <code>/roulette &lt;ставка&gt; &lt;игроки&gt;</code>\n\n"
-            f"• <code>&lt;ставка&gt;</code>: от {settings.roulette_min_bet} до {settings.roulette_max_bet} 🍺\n"
-            "• <code>&lt;игроки&gt;</code>: от 2 до 6 человек\n\n"
-            "Пример: <code>/roulette 10 4</code>", parse_mode='HTML'
-        )
-    # --- КОНЕЦ ИСПРАВЛЕНИЯ ---
+        return await message.reply(get_roulette_help_text(settings), parse_mode='HTML')
 
     chat_id = message.chat.id
-    if chat_id in active_games: return await message.reply("В этом чате уже идет игра.")
+    if chat_id in active_games:
+        return await message.reply(
+            "🎰 <b>Пивная рулетка</b>\n\n"
+            "В этом чате уже открыто лобби. Доиграйте текущий раунд.",
+            parse_mode='HTML'
+        )
     
     roulette_cooldown = settings.roulette_cooldown
     if chat_id in chat_cooldowns:
         time_since = datetime.now() - chat_cooldowns[chat_id]
         if time_since.total_seconds() < roulette_cooldown:
             remaining = timedelta(seconds=roulette_cooldown) - time_since
-            return await message.reply(f"Создавать новую игру можно будет через: {format_time_delta(remaining)}.")
+            return await message.reply(
+                "🎰 <b>Пивная рулетка</b>\n\n"
+                "Барабан остывает после прошлой игры.\n\n"
+                f"{DIVIDER}\n"
+                f"Новая игра через: <b>{format_time_delta(remaining)}</b>.",
+                parse_mode='HTML'
+            )
             
     stake, max_players = int(args[1]), int(args[2])
     
@@ -91,16 +119,22 @@ async def cmd_roulette(message: Message, bot: Bot, db: Database, settings: Setti
     max_bet = settings.roulette_max_bet
     
     if not (min_bet <= stake <= max_bet):
-        return await message.reply(f"Ставка должна быть от {min_bet} до {max_bet} 🍺.")
-    if not (2 <= max_players <= 6): return await message.reply("Количество игроков должно быть от 2 до 6.")
+        return await message.reply(f"🎰 <b>Пивная рулетка</b>\n\nСтавка должна быть от <b>{min_bet}</b> до <b>{max_bet}</b> 🍺.", parse_mode='HTML')
+    if not (2 <= max_players <= 6):
+        return await message.reply("🎰 <b>Пивная рулетка</b>\n\nИгроков должно быть от <b>2</b> до <b>6</b>.", parse_mode='HTML')
     
     creator = message.from_user
     if not await check_user_registered(message, bot, db): return
     creator_balance = await db.get_user_beer_rating(creator.id)
-    if creator_balance < stake: return await message.reply(f"У вас недостаточно пива. Нужно {stake} 🍺, у вас {creator_balance} 🍺.")
+    if creator_balance < stake:
+        return await message.reply(
+            "🎰 <b>Пивная рулетка</b>\n\n"
+            f"Для входа нужно <b>{stake}</b> 🍺, у тебя <b>{creator_balance}</b> 🍺.",
+            parse_mode='HTML'
+        )
     
     await db.change_rating(creator.id, -stake)
-    lobby_message = await message.answer("Создание лобби...")
+    lobby_message = await message.answer("🎰 Крупье ставит кружки на стойку...")
     game = GameState(creator, stake, max_players, lobby_message.message_id)
     active_games[chat_id] = game
     with suppress(TelegramBadRequest): await bot.pin_chat_message(chat_id=chat_id, message_id=lobby_message.message_id, disable_notification=True)
@@ -124,7 +158,7 @@ async def on_roulette_button_click(callback: CallbackQuery, callback_data: Roule
         if balance < game.stake: return await callback.answer(f"Недостаточно пива! Нужно {game.stake} 🍺, у вас {balance} 🍺.", show_alert=True)
         await db.change_rating(user.id, -game.stake)
         game.players[user.id] = user
-        await callback.answer("Вы присоединились к игре!")
+        await callback.answer("Ты занял место у стойки.")
         if len(game.players) == game.max_players:
             if game.task: game.task.cancel()
             await start_roulette_game(chat_id, bot, db)
@@ -136,7 +170,7 @@ async def on_roulette_button_click(callback: CallbackQuery, callback_data: Roule
         if user.id == game.creator.id: return await callback.answer("Создатель не может покинуть игру. Только отменить.", show_alert=True)
         del game.players[user.id]
         await db.change_rating(user.id, game.stake)
-        await callback.answer("Вы покинули игру, ваша ставка возвращена.", show_alert=True)
+        await callback.answer("Ты вышел из лобби. Ставка возвращена.", show_alert=True)
         await callback.message.edit_text(await generate_lobby_text(game), reply_markup=get_roulette_keyboard(game), parse_mode='HTML')
         
     elif action == "cancel":
@@ -145,7 +179,10 @@ async def on_roulette_button_click(callback: CallbackQuery, callback_data: Roule
         for player_id in game.players: await db.change_rating(player_id, game.stake)
         del active_games[chat_id]
         with suppress(TelegramBadRequest): await bot.unpin_chat_message(chat_id=chat_id, message_id=game.lobby_message_id)
-        await callback.message.edit_text("Игра отменена создателем. Все ставки возвращены.")
+        await callback.message.edit_text(
+            get_roulette_cancel_text("Создатель закрыл лобби до старта."),
+            parse_mode='HTML'
+        )
         await callback.answer()
 
 async def schedule_game_start(chat_id: int, bot: Bot, db: Database):
@@ -157,7 +194,13 @@ async def schedule_game_start(chat_id: int, bot: Bot, db: Database):
             await start_roulette_game(chat_id, bot, db)
         else:
             await db.change_rating(game.creator.id, game.stake)
-            await bot.edit_message_text(text="Недостаточно игроков. Игра отменена.", chat_id=chat_id, message_id=game.lobby_message_id, reply_markup=None)
+            await bot.edit_message_text(
+                text=get_roulette_cancel_text("Недостаточно игроков. Барабан остался на полке."),
+                chat_id=chat_id,
+                message_id=game.lobby_message_id,
+                reply_markup=None,
+                parse_mode='HTML'
+            )
             with suppress(TelegramBadRequest):
                 await bot.unpin_chat_message(chat_id=chat_id, message_id=game.lobby_message_id)
             del active_games[chat_id]
@@ -172,20 +215,40 @@ async def start_roulette_game(chat_id: int, bot: Bot, db: Database):
     if chat_id not in active_games: return
     game = active_games[chat_id]
     with suppress(TelegramBadRequest): await bot.unpin_chat_message(chat_id=chat_id, message_id=game.lobby_message_id)
-    await bot.edit_message_text(text=f"Все в сборе! Ставки ({game.stake} 🍺 с каждого). Крутим барабан... 🔫", chat_id=chat_id, message_id=game.lobby_message_id, reply_markup=None)
+    await bot.edit_message_text(
+        text=(
+            "🎰 <b>Пивная рулетка</b>\n\n"
+            "Все места заняты. Кружки на кону, барабан пошел.\n\n"
+            f"{DIVIDER}\n"
+            f"Ставка каждого: <b>{game.stake}</b> 🍺\n"
+            f"Банк: <b>{game.stake * len(game.players)}</b> 🍺"
+        ),
+        chat_id=chat_id,
+        message_id=game.lobby_message_id,
+        reply_markup=None,
+        parse_mode='HTML'
+    )
     await asyncio.sleep(3)
     players_in_game = list(game.players.values())
     round_num = 1
     while len(players_in_game) > 1:
-        await bot.send_message(chat_id, f"🍻 <b>Раунд {round_num}</b>. Крутим барабан... 🔫", parse_mode='HTML')
+        await bot.send_message(
+            chat_id,
+            f"🎰 <b>Раунд {round_num}</b>\n\nБарабан крутится. За стойкой становится тише.",
+            parse_mode='HTML'
+        )
         await asyncio.sleep(5)
         loser = random.choice(players_in_game)
         players_in_game.remove(loser)
         remaining_players_text = "\n".join(f"• {escape(p.full_name)}" for p in players_in_game)
         await bot.send_message(
             chat_id,
-            text=f"Выбывает... <b>{escape(loser.full_name)}</b>! 😖\n\n"
-                 f"<i>Остались в игре:</i>\n{remaining_players_text}",
+            text=(
+                "💥 <b>Минус кружка</b>\n\n"
+                f"Выбывает: <b>{escape(loser.full_name)}</b>\n\n"
+                f"{DIVIDER}\n"
+                f"<b>Остались у стойки:</b>\n{remaining_players_text}"
+            ),
             parse_mode='HTML'
         )
         round_num += 1
@@ -194,9 +257,11 @@ async def start_roulette_game(chat_id: int, bot: Bot, db: Database):
     prize = game.stake * len(game.players)
     await db.change_rating(winner.id, prize)
     winner_text = (
-        f"🏆 <b>ПОБЕДИТЕЛЬ!</b> 🏆\n\n"
-        f"Поздравляем, <b>{escape(winner.full_name)}</b>! Он забирает весь банк: <b>{prize} 🍺</b>!\n\n"
-        f"<i>Игра окончена.</i>"
+        f"🏆 <b>Победа в рулетке</b>\n\n"
+        f"<b>{escape(winner.full_name)}</b> остался последним у стойки.\n\n"
+        f"{DIVIDER}\n"
+        f"Банк забран: <b>+{prize}</b> 🍺\n\n"
+        f"<i>Пивная рулетка закрыта до следующего раунда.</i>"
     )
     winner_message = await bot.send_message(chat_id, text=winner_text, parse_mode='HTML')
     with suppress(TelegramBadRequest):
