@@ -1,12 +1,12 @@
 # handlers/user_commands.py
-from aiogram import Router, Bot, html # ✅ (Импортируем html)
+from aiogram import Router, Bot
 from aiogram.types import Message
 from aiogram.filters import Command
 
 from database import Database
 from settings import SettingsManager
 from .beer_service import run_beer_attempt
-from .common import check_user_registered, get_profile_text
+from .common import check_user_registered, get_profile_text, get_top_text
 
 # --- ИНИЦИАЛИЗАЦИЯ --
 user_commands_router = Router()
@@ -40,26 +40,8 @@ async def cmd_top(message: Message, bot: Bot, db: Database):
     # (Проверка регистрации в группе)
     if message.chat.type != 'private' and not await check_user_registered(message, bot, db):
         return
-        
-    top_users = await db.get_top_users()
-    if not top_users: 
-        return await message.answer("В баре пока никого нет, чтобы составить топ.")
 
-    top_text = "🏆 <b>Топ бара</b>\n\n"
-    medals = ["🥇", "🥈", "🥉"]
-    
-    for i, (first_name, last_name, rating) in enumerate(top_users):
-        name = html.quote(first_name)
-        if last_name:
-            name += f" {html.quote(last_name)}"
-            
-        place = medals[i] if i < len(medals) else f"{i + 1}."
-        top_text += f"{place} {name} — {rating} 🍺\n"
-
-    user_rank = await db.get_user_rank(message.from_user.id)
-    if user_rank:
-        top_text += f"\nТы: #{user_rank['rank']} — {user_rank['rating']} 🍺"
-        
+    top_text = await get_top_text(db, message.from_user.id)
     await message.answer(top_text, parse_mode='HTML')
 
 

@@ -12,6 +12,7 @@ from .beer_service import run_beer_attempt
 from utils import format_time_delta
 
 common_router = Router()
+DIVIDER = "<code>--- --- ---</code>"
 
 
 class MainMenuCallback(CallbackData, prefix="menu"):
@@ -45,13 +46,18 @@ def get_private_start_text(user_name: str, is_new: bool) -> str:
     user_name = escape(user_name)
     if is_new:
         return (
-            f"🍺 <b>Добро пожаловать в Пивную, {user_name}.</b>\n\n"
-            "Твоя кружка пока пустая, но бар уже открыт.\n"
-            "Жми кнопку ниже и начинай набивать репутацию."
+            f"🍺 <b>Пивная</b>\n\n"
+            f"Добро пожаловать, <b>{user_name}</b>.\n"
+            "Бар открыт, первая кружка ждет.\n\n"
+            f"{DIVIDER}\n"
+            "Выбирай действие ниже и начинай набивать репутацию."
         )
     return (
-        f"🍺 <b>С возвращением, {user_name}.</b>\n\n"
-        "Бар на месте. Кружка ждет."
+        f"🍺 <b>Пивная</b>\n\n"
+        f"С возвращением, <b>{user_name}</b>.\n"
+        "Бар на месте. Кружка ждет.\n\n"
+        f"{DIVIDER}\n"
+        "Меню стойки ниже."
     )
 
 
@@ -74,14 +80,15 @@ async def get_profile_text(user_id: int, user_name: str, db: Database, settings:
     return (
         f"👤 <b>Профиль</b>\n\n"
         f"<b>{user_name}</b>\n"
-        f"Статус: {get_rating_title(rating)}\n"
-        f"Рейтинг: {rating} 🍺\n"
-        f"Место: {rank_text}\n\n"
-        f"🍺 Выпить: {beer_status}\n\n"
+        f"{DIVIDER}\n"
+        f"Статус: <b>{get_rating_title(rating)}</b>\n"
+        f"Рейтинг: <b>{rating}</b> 🍺\n"
+        f"Место: <b>{rank_text}</b>\n\n"
+        f"🍺 <b>Бар:</b> {beer_status}\n\n"
         f"🌾 <b>Ферма</b>\n"
-        f"Поле: ур. {farm.get('field_level', 1)}\n"
-        f"Пивоварня: ур. {farm.get('brewery_level', 1)}\n"
-        f"Склад: {inventory.get('зерно', 0)} 🌾 / {inventory.get('хмель', 0)} 🌱"
+        f"Поле: ур. <b>{farm.get('field_level', 1)}</b>\n"
+        f"Пивоварня: ур. <b>{farm.get('brewery_level', 1)}</b>\n"
+        f"Склад: <b>{inventory.get('зерно', 0)}</b> 🌾 / <b>{inventory.get('хмель', 0)}</b> 🌱"
     )
 
 
@@ -117,9 +124,18 @@ def get_rating_title(rating: int) -> str:
 async def get_top_text(db: Database, user_id: int | None = None) -> str:
     top_users = await db.get_top_users()
     if not top_users:
-        return "В баре пока никого нет, чтобы составить топ."
+        return (
+            "🏆 <b>Топ бара</b>\n\n"
+            "В баре пока тихо.\n\n"
+            f"{DIVIDER}\n"
+            "Первый рейтинг появится после команды <code>/beer</code>."
+        )
 
-    text = "🏆 <b>Топ бара</b>\n\n"
+    text = (
+        "🏆 <b>Топ бара</b>\n\n"
+        "Самые заметные гости у стойки.\n\n"
+        f"{DIVIDER}\n"
+    )
     medals = ["🥇", "🥈", "🥉"]
     for i, (first_name, last_name, rating) in enumerate(top_users):
         name = first_name or "Игрок"
@@ -132,25 +148,25 @@ async def get_top_text(db: Database, user_id: int | None = None) -> str:
     if user_id:
         rank = await db.get_user_rank(user_id)
         if rank:
-            text += f"\nТы: #{rank['rank']} — {rank['rating']} 🍺"
+            text += f"\n{DIVIDER}\nТы: <b>#{rank['rank']}</b> — <b>{rank['rating']}</b> 🍺"
     return text
 
 
 def get_help_text() -> str:
     return (
-        "<b>🍻 Меню Бара (Помощь) 🍻</b>\n\n"
-        "Запутался? Не беда, вот наша 'карта'.\n\n"
-        "--- --- ---\n"
+        "❓ <b>Помощь</b>\n\n"
+        "Карта бара и основные команды.\n\n"
+        f"{DIVIDER}\n"
         "<b>Основное:</b>\n"
         "• <code>/start</code> - Зарегистрироваться или проверить свой профиль.\n"
         "• <code>/beer</code> - Испытать удачу (раз в 2 часа).\n"
         "• <code>/top</code> - Показать таблицу лидеров.\n"
         "• <code>/jackpot</code> - Проверить текущий джекпот.\n\n"
-        "--- --- ---\n"
+        f"{DIVIDER}\n"
         "<b>Мини-игры:</b>\n"
         "• <code>/roulette &lt;ставка&gt; &lt;игроки&gt;</code> - Запустить 'Пивную рулетку' в группе.\n"
         "• <code>/ladder &lt;ставка&gt;</code> - Начать игру в 'Пивную лесенку'.\n\n"
-        "--- --- ---\n"
+        f"{DIVIDER}\n"
         "<b>Прочее:</b>\n"
         "• <code>/id</code> - Узнать свой User ID и ID текущего чата."
     )
@@ -242,7 +258,9 @@ async def cq_main_menu(callback: CallbackQuery, callback_data: MainMenuCallback,
         current_jackpot = await db.get_jackpot()
         text = (
             "🎁 <b>Джекпот бара</b>\n\n"
-            f"В банке: {current_jackpot} 🍺"
+            "Общий банк, который может сорвать любой удачный гость.\n\n"
+            f"{DIVIDER}\n"
+            f"В банке: <b>{current_jackpot}</b> 🍺"
         )
         keyboard = get_back_to_menu_keyboard()
     elif callback_data.action == "help":
@@ -271,9 +289,10 @@ async def cq_main_menu(callback: CallbackQuery, callback_data: MainMenuCallback,
 @common_router.message(Command("id"))
 async def cmd_id(message: Message):
     await message.reply(
-        f"ℹ️ **Информация:**\n\n"
-        f"👤 Ваш User ID: <code>{message.from_user.id}</code>\n"
-        f"💬 ID этого чата: <code>{message.chat.id}</code>",
+        f"ℹ️ <b>Информация</b>\n\n"
+        f"{DIVIDER}\n"
+        f"👤 User ID: <code>{message.from_user.id}</code>\n"
+        f"💬 Chat ID: <code>{message.chat.id}</code>",
         parse_mode='HTML'
     )
 
@@ -281,8 +300,10 @@ async def cmd_id(message: Message):
 async def cmd_jackpot(message: Message, db: Database):
     current_jackpot = await db.get_jackpot()
     await message.answer(
-        f"💰 <b>Текущий Джекпот</b> 💰\n\n"
-        f"В банке сейчас накоплено: <b>{current_jackpot} 🍺</b>\n\n"
-        f"<i>Каждый проигрыш в <code>/beer</code> пополняет банк, и каждый, кто нажимает <code>/beer</code>, может его сорвать!</i>",
+        f"🎁 <b>Джекпот бара</b>\n\n"
+        f"Общий банк для самых удачных гостей.\n\n"
+        f"{DIVIDER}\n"
+        f"В банке: <b>{current_jackpot}</b> 🍺\n\n"
+        f"<i>Каждый проигрыш в <code>/beer</code> пополняет банк.</i>",
         parse_mode='HTML'
     )

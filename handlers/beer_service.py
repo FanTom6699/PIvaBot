@@ -7,6 +7,7 @@ from settings import SettingsManager
 from utils import format_time_delta
 
 user_spam_tracker = {}
+DIVIDER = "<code>--- --- ---</code>"
 
 BEER_WIN_LINES = [
     "Бармен молча кивнул. Похоже, ты сегодня свой.",
@@ -78,7 +79,12 @@ async def run_beer_attempt(user_id: int, db: Database, settings: SettingsManager
         if time_passed.total_seconds() < cooldown_seconds:
             time_left = timedelta(seconds=cooldown_seconds) - time_passed
             return {
-                "text": f"{random.choice(BEER_COOLDOWN_LINES)}\n\n⏳ {format_time_delta(time_left)}",
+                "text": (
+                    "⏳ <b>Бар на паузе</b>\n\n"
+                    f"{random.choice(BEER_COOLDOWN_LINES)}\n\n"
+                    f"{DIVIDER}\n"
+                    f"Осталось: <b>{format_time_delta(time_left)}</b>"
+                ),
                 "jackpot_text": None,
                 "spam": False,
             }
@@ -94,16 +100,31 @@ async def run_beer_attempt(user_id: int, db: Database, settings: SettingsManager
 
     if win_roll > 35:
         rating_change = random.randint(1, 15)
-        text = f"{random.choice(BEER_WIN_LINES)}\n\n+{rating_change} 🍺"
+        text = (
+            "🍺 <b>Барная попытка</b>\n\n"
+            f"{random.choice(BEER_WIN_LINES)}\n\n"
+            f"{DIVIDER}\n"
+            f"Итог: <b>+{rating_change}</b> 🍺"
+        )
     else:
         current_rating = await db.get_user_beer_rating(user_id)
         if current_rating > 0:
             rating_loss = random.randint(1, 10)
             rating_change = -min(current_rating, rating_loss)
-            text = f"{random.choice(BEER_LOSE_LINES)}\n\n{rating_change} 🍺"
+            text = (
+                "🍺 <b>Барная попытка</b>\n\n"
+                f"{random.choice(BEER_LOSE_LINES)}\n\n"
+                f"{DIVIDER}\n"
+                f"Итог: <b>{rating_change}</b> 🍺"
+            )
         else:
             rating_change = random.randint(1, 3)
-            text = f"{random.choice(BEER_ZERO_LINES)}\n\n+{rating_change} 🍺"
+            text = (
+                "🍺 <b>Барная попытка</b>\n\n"
+                f"{random.choice(BEER_ZERO_LINES)}\n\n"
+                f"{DIVIDER}\n"
+                f"Итог: <b>+{rating_change}</b> 🍺"
+            )
 
     if rating_change != 0:
         await db.change_rating(user_id, rating_change)
@@ -117,9 +138,10 @@ async def run_beer_attempt(user_id: int, db: Database, settings: SettingsManager
             await db.reset_jackpot()
             await db.change_rating(user_id, current_jackpot)
             jackpot_text = (
+                f"🎉 <b>Джекпот</b>\n\n"
                 f"{random.choice(BEER_JACKPOT_LINES)}\n\n"
-                f"🎉 <b>ДЖЕКПОТ</b>\n"
-                f"+{current_jackpot} 🍺"
+                f"{DIVIDER}\n"
+                f"Бонус: <b>+{current_jackpot}</b> 🍺"
             )
 
     return {"text": text, "jackpot_text": jackpot_text, "spam": False}
