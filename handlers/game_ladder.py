@@ -127,6 +127,30 @@ async def generate_ladder_keyboard(game: LadderGameState, rewards: List[float], 
 async def generate_ladder_text(game: LadderGameState) -> str:
     return (f"🪜 <b>Пивная Лесенка</b> 🪜\n\n" f"Ставка: <b>{game.stake} 🍺</b> | Текущий выигрыш: <b>{game.current_win} 🍺</b>")
 
+async def cancel_ladder_game(bot: Bot, db: Database, game: LadderGameState, reason: str) -> None:
+    game.is_finished = True
+    if game.task:
+        game.task.cancel()
+        game.task = None
+
+    await db.change_rating(game.player_id, game.stake)
+
+    with suppress(TelegramBadRequest):
+        await bot.delete_message(chat_id=game.chat_id, message_id=game.message_id)
+
+    if game.chat_id in active_ladder_games:
+        del active_ladder_games[game.chat_id]
+
+    await bot.send_message(
+        chat_id=game.chat_id,
+        text=(
+            "🪜 <b>Пивная Лесенка</b>\n\n"
+            f"{reason}\n\n"
+            f"Ставка <b>{game.stake} 🍺</b> возвращена."
+        ),
+        parse_mode='HTML'
+    )
+
 async def end_ladder_game(bot: Bot, chat_id: int, user: User, game: LadderGameState, is_win: bool, db: Database):
     game.is_finished = True
     if game.task:
@@ -210,7 +234,20 @@ async def start_ladder_game(chat: Chat, user: User, bot: Bot, stake: int, db: Da
 async def cmd_ladder(message: Message, bot: Bot, db: Database, settings: SettingsManager):
     chat_id = message.chat.id
     if chat_id in active_ladder_games:
-        return await message.reply("Пожалуйста, подождите, пока текущая игра в 'Лесенку' в этом чате не закончится.")
+        game = active_ladder_games[chat_id]
+        if game.player_id == message.from_user.id and game.current_level == 1 and game.current_win == 0:
+            await cancel_ladder_game(
+                bot,
+                db,
+                game,
+                "Прошлая игра была отменена перед первым ходом."
+            )
+        else:
+            return await message.reply(
+                "В этом чате уже идет <b>Пивная Лесенка</b>.\n"
+                "Закончи текущую игру или забери выигрыш.",
+                parse_mode='HTML'
+            )
     args = message.text.split()
     
     # --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
@@ -265,7 +302,9 @@ async def on_ladder_game_callback(callback: CallbackQuery, callback_data: Ladder
     
     if action == "cash_out":
         if game.current_win == 0 and game.current_level == 1:
-            return await callback.answer("Сделайте хотя бы один ход!", show_alert=True)
+            await callback.answer()
+            await cancel_ladder_game(bot, db, game, "Игра отменена до первого хода.")
+            return
         await callback.answer()
         await end_ladder_game(bot, chat_id, user, game, is_win=True, db=db)
         return
