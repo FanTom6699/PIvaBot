@@ -117,11 +117,11 @@ async def cmd_beer(message: Message, bot: Bot, db: Database, settings: SettingsM
         if current_rating > 0:
             rating_loss = random.randint(1, 10) # ✅ Проигрыш: -1 до -10
             # (Не даем уйти в минус)
-            rating_change = -min(current_rating, rating_loss) 
+            rating_change = -min(current_rating, rating_loss)
             reply_text = f"{random.choice(BEER_LOSE_LINES)}\n\n{rating_change} 🍺"
         else:
-            rating_change = 0 # (Не меняем рейтинг)
-            reply_text = f"{random.choice(BEER_ZERO_LINES)}\n\n0 🍺"
+            rating_change = random.randint(1, 3)
+            reply_text = f"{random.choice(BEER_ZERO_LINES)}\n\n+{rating_change} 🍺"
 
     # --- ✅✅✅ ИСПРАВЛЕНИЕ: ✅✅✅ ---
     # 1. Сначала меняем рейтинг (если он изменился)
