@@ -128,6 +128,8 @@ async def run_beer_attempt(user_id: int, db: Database, settings: SettingsManager
 
     if rating_change != 0:
         await db.change_rating(user_id, rating_change)
+        if rating_change < 0:
+            await db.increase_jackpot(abs(rating_change))
 
     await db.update_last_beer_time(user_id)
 

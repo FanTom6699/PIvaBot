@@ -152,6 +152,17 @@ async def get_top_text(db: Database, user_id: int | None = None) -> str:
     return text
 
 
+def get_jackpot_text(current_jackpot: int) -> str:
+    return (
+        "🎁 <b>Джекпот бара</b>\n\n"
+        "Общий банк всех чатов.\n"
+        "Когда в <code>/beer</code> выпадает минус, потерянные 🍺 уходят сюда.\n\n"
+        f"{DIVIDER}\n"
+        f"В банке: <b>{current_jackpot}</b> 🍺\n\n"
+        "<i>Сорвать джекпот может любой удачный гость при следующей попытке.</i>"
+    )
+
+
 def get_help_text() -> str:
     return (
         "❓ <b>Помощь</b>\n\n"
@@ -256,12 +267,7 @@ async def cq_main_menu(callback: CallbackQuery, callback_data: MainMenuCallback,
         keyboard = get_back_to_menu_keyboard()
     elif callback_data.action == "jackpot":
         current_jackpot = await db.get_jackpot()
-        text = (
-            "🎁 <b>Джекпот бара</b>\n\n"
-            "Общий банк, который может сорвать любой удачный гость.\n\n"
-            f"{DIVIDER}\n"
-            f"В банке: <b>{current_jackpot}</b> 🍺"
-        )
+        text = get_jackpot_text(current_jackpot)
         keyboard = get_back_to_menu_keyboard()
     elif callback_data.action == "help":
         text = get_help_text()
@@ -299,11 +305,4 @@ async def cmd_id(message: Message):
 @common_router.message(Command("jackpot"))
 async def cmd_jackpot(message: Message, db: Database):
     current_jackpot = await db.get_jackpot()
-    await message.answer(
-        f"🎁 <b>Джекпот бара</b>\n\n"
-        f"Общий банк для самых удачных гостей.\n\n"
-        f"{DIVIDER}\n"
-        f"В банке: <b>{current_jackpot}</b> 🍺\n\n"
-        f"<i>Каждый проигрыш в <code>/beer</code> пополняет банк.</i>",
-        parse_mode='HTML'
-    )
+    await message.answer(get_jackpot_text(current_jackpot), parse_mode='HTML')
