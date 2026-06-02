@@ -1,0 +1,19 @@
+services:
+  - type: worker
+    name: piva-bot-worker
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    disk:
+      name: piva-bot-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: ADMIN_ID
+        sync: false
+      - key: DB_NAME
+        value: /data/bot_database.db
+      - key: PYTHON_VERSION
+        value: "3.11"
