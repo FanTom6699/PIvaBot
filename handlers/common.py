@@ -85,6 +85,27 @@ async def get_top_text(db: Database, user_id: int | None = None) -> str:
             text += f"\nТы: #{rank['rank']} — {rank['rating']} 🍺"
     return text
 
+
+def get_help_text() -> str:
+    return (
+        "<b>🍻 Меню Бара (Помощь) 🍻</b>\n\n"
+        "Запутался? Не беда, вот наша 'карта'.\n\n"
+        "--- --- ---\n"
+        "<b>Основное:</b>\n"
+        "• <code>/start</code> - Зарегистрироваться или проверить свой профиль.\n"
+        "• <code>/beer</code> - Испытать удачу (раз в 2 часа).\n"
+        "• <code>/top</code> - Показать таблицу лидеров.\n"
+        "• <code>/jackpot</code> - Проверить текущий джекпот.\n\n"
+        "--- --- ---\n"
+        "<b>Мини-игры:</b>\n"
+        "• <code>/roulette &lt;ставка&gt; &lt;игроки&gt;</code> - Запустить 'Пивную рулетку' в группе.\n"
+        "• <code>/ladder &lt;ставка&gt;</code> - Начать игру в 'Пивную лесенку'.\n\n"
+        "--- --- ---\n"
+        "<b>Прочее:</b>\n"
+        "• <code>/id</code> - Узнать свой User ID и ID текущего чата."
+    )
+
+
 # --- ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ РЕГИСТРАЦИИ (ТВОЙ ТЕКСТ) ---
 async def check_user_registered(message_or_callback: Message | CallbackQuery, bot: Bot, db: Database) -> bool:
     user = message_or_callback.from_user
@@ -150,26 +171,7 @@ async def cmd_start(message: Message, bot: Bot, db: Database):
 
 @common_router.message(Command("help"))
 async def cmd_help(message: Message):
-    # Твое новое "Меню Бара":
-    help_text = (
-        "<b>🍻 Меню Бара (Помощь) 🍻</b>\n\n"
-        "Запутался? Не беда, вот наша 'карта'.\n\n"
-        "--- --- ---\n"
-        "<b>Основное:</b>\n"
-        "• <code>/start</code> - Зарегистрироваться или проверить свой профиль.\n"
-        "• <code>/beer</code> - Испытать удачу (раз в 2 часа).\n"
-        "• <code>/top</code> - Показать таблицу лидеров.\n"
-        "• <code>/jackpot</code> - Проверить текущий джекпот.\n\n"
-        "--- --- ---\n"
-        "<b>Мини-игры:</b>\n"
-        # Важно: &lt; и &gt; нужны, чтобы /set и /ladder не сломали HTML-разметку
-        "• <code>/roulette &lt;ставка&gt; &lt;игроки&gt;</code> - Запустить 'Пивную рулетку' в группе.\n"
-        "• <code>/ladder &lt;ставка&gt;</code> - Начать игру в 'Пивную лесенку'.\n\n"
-        "--- --- ---\n"
-        "<b>Прочее:</b>\n"
-        "• <code>/id</code> - Узнать свой User ID и ID текущего чата."
-    )
-    await message.answer(help_text, parse_mode='HTML')
+    await message.answer(get_help_text(), parse_mode='HTML')
 
 
 @common_router.callback_query(MainMenuCallback.filter())
@@ -194,15 +196,7 @@ async def cq_main_menu(callback: CallbackQuery, callback_data: MainMenuCallback,
         )
         keyboard = get_back_to_menu_keyboard()
     elif callback_data.action == "help":
-        text = (
-            "❓ <b>Помощь</b>\n\n"
-            "/beer — испытать удачу\n"
-            "/top — топ бара\n"
-            "/me — краткий профиль\n"
-            "/farm — ферма\n"
-            "/roulette — рулетка в группе\n"
-            "/ladder — лесенка"
-        )
+        text = get_help_text()
         keyboard = get_back_to_menu_keyboard()
     elif callback_data.action == "beer":
         text = "Напиши /beer в личке или группе, чтобы испытать удачу."
