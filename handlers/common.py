@@ -1,10 +1,83 @@
 # handlers/common.py
+from html import escape
+
 from aiogram import Router, F, Bot
 from aiogram.types import Message, CallbackQuery, ChatMemberUpdated, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import CommandStart, Command
+from aiogram.filters.callback_data import CallbackData
 from database import Database
 
 common_router = Router()
+
+
+class MainMenuCallback(CallbackData, prefix="menu"):
+    action: str
+
+
+def get_main_menu_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="🍺 Выпить", callback_data=MainMenuCallback(action="beer").pack()),
+            InlineKeyboardButton(text="👤 Профиль", callback_data=MainMenuCallback(action="profile").pack()),
+        ],
+        [
+            InlineKeyboardButton(text="🏆 Топ", callback_data=MainMenuCallback(action="top").pack()),
+            InlineKeyboardButton(text="🌾 Ферма", callback_data=f"farm:main_dashboard:{user_id}"),
+        ],
+        [
+            InlineKeyboardButton(text="🎁 Джекпот", callback_data=MainMenuCallback(action="jackpot").pack()),
+            InlineKeyboardButton(text="❓ Помощь", callback_data=MainMenuCallback(action="help").pack()),
+        ],
+    ])
+
+
+def get_private_start_text(user_name: str, is_new: bool) -> str:
+    user_name = escape(user_name)
+    if is_new:
+        return (
+            f"🍺 <b>Добро пожаловать в Пивную, {user_name}.</b>\n\n"
+            "Твоя кружка пока пустая, но бар уже открыт.\n"
+            "Жми кнопку ниже и начинай набивать репутацию."
+        )
+    return (
+        f"🍺 <b>С возвращением, {user_name}.</b>\n\n"
+        "Бар на месте. Кружка ждет."
+    )
+
+
+async def get_profile_text(user_id: int, user_name: str, db: Database) -> str:
+    user_name = escape(user_name)
+    profile = await db.get_user_profile(user_id)
+    rating = profile[3] if profile else 0
+    rank = await db.get_user_rank(user_id)
+    rank_text = f"#{rank['rank']}" if rank else "—"
+    return (
+        f"🍺 <b>{user_name}</b>\n\n"
+        f"Рейтинг: {rating} 🍺\n"
+        f"Место: {rank_text}"
+    )
+
+
+async def get_top_text(db: Database, user_id: int | None = None) -> str:
+    top_users = await db.get_top_users()
+    if not top_users:
+        return "В баре пока никого нет, чтобы составить топ."
+
+    text = "🏆 <b>Топ бара</b>\n\n"
+    medals = ["🥇", "🥈", "🥉"]
+    for i, (first_name, last_name, rating) in enumerate(top_users):
+        name = first_name or "Игрок"
+        if last_name:
+            name += f" {last_name}"
+        name = escape(name)
+        place = medals[i] if i < len(medals) else f"{i + 1}."
+        text += f"{place} {name} — {rating} 🍺\n"
+
+    if user_id:
+        rank = await db.get_user_rank(user_id)
+        if rank:
+            text += f"\nТы: #{rank['rank']} — {rank['rating']} 🍺"
+    return text
 
 # --- ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ РЕГИСТРАЦИИ (ТВОЙ ТЕКСТ) ---
 async def check_user_registered(message_or_callback: Message | CallbackQuery, bot: Bot, db: Database) -> bool:
@@ -43,27 +116,31 @@ async def handle_bot_membership(event: ChatMemberUpdated, bot: Bot, db: Database
 
 # --- КОМАНДЫ ПОЛЬЗОВАТЕЛЕЙ (ТВОЙ ТЕКСТ) ---
 @common_router.message(CommandStart())
-async def cmd_start(message: Message, db: Database):
+async def cmd_start(message: Message, bot: Bot, db: Database):
     user = message.from_user
-    if not await db.user_exists(user.id):
-        await db.add_user(user.id, user.first_name, user.last_name, user.username)
-        
-        # Твой новый приветственный текст:
-        welcome_text = (
-            f"Рад знакомству, <b>{user.full_name}</b>! 🤝\n\n"
-            f"Добро пожаловать в 'Пивную'. Твоя кружка пока пуста (рейтинг: 0 🍺), но это легко исправить!\n\n"
-            f"<b>Вот твоя карта бара:</b>\n"
-            f"• <code>/beer</code> - Испытать удачу (раз в 2 часа).\n"
-            f"• <code>/top</code> - Показать таблицу лидеров.\n"
-            f"• <code>/jackpot</code> - Проверить текущий джекпот.\n"
-            f"• <code>/roulette &lt;ставка&gt; &lt;игроки&gt;</code> - Запустить 'Пивную рулетку'.\n"
-            f"• <code>/ladder &lt;ставка&gt;</code> - Начать игру в 'Пивную лесенку'.\n"
-            f"• <code>/help</code> - Показать эту справку."
+    if message.chat.type != "private":
+        me = await bot.get_me()
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="🍺 Открыть меню", url=f"https://t.me/{me.username}?start=menu")
+        ]])
+        await message.reply(
+            "Меню бара открывается в личке.",
+            reply_markup=keyboard,
+            parse_mode='HTML'
         )
-        await message.answer(welcome_text, parse_mode='HTML')
+        return
+
+    is_new = not await db.user_exists(user.id)
+    if is_new:
+        await db.add_user(user.id, user.first_name, user.last_name, user.username)
     else:
-        rating = await db.get_user_beer_rating(user.id)
-        await message.answer(f"С возвращением, {user.full_name}! 🍻\nТвой текущий рейтинг: {rating} 🍺.")
+        await db.add_user(user.id, user.first_name, user.last_name, user.username)
+
+    await message.answer(
+        get_private_start_text(user.full_name, is_new),
+        reply_markup=get_main_menu_keyboard(user.id),
+        parse_mode='HTML'
+    )
 
 @common_router.message(Command("help"))
 async def cmd_help(message: Message):
@@ -87,6 +164,44 @@ async def cmd_help(message: Message):
         "• <code>/id</code> - Узнать свой User ID и ID текущего чата."
     )
     await message.answer(help_text, parse_mode='HTML')
+
+
+@common_router.callback_query(MainMenuCallback.filter())
+async def cq_main_menu(callback: CallbackQuery, callback_data: MainMenuCallback, db: Database):
+    user = callback.from_user
+    await db.add_user(user.id, user.first_name, user.last_name, user.username)
+
+    if callback_data.action == "profile":
+        text = await get_profile_text(user.id, user.full_name, db)
+    elif callback_data.action == "top":
+        text = await get_top_text(db, user.id)
+    elif callback_data.action == "jackpot":
+        current_jackpot = await db.get_jackpot()
+        text = (
+            "🎁 <b>Джекпот бара</b>\n\n"
+            f"В банке: {current_jackpot} 🍺"
+        )
+    elif callback_data.action == "help":
+        text = (
+            "❓ <b>Помощь</b>\n\n"
+            "/beer — испытать удачу\n"
+            "/top — топ бара\n"
+            "/me — краткий профиль\n"
+            "/farm — ферма\n"
+            "/roulette — рулетка в группе\n"
+            "/ladder — лесенка"
+        )
+    elif callback_data.action == "beer":
+        text = "Напиши /beer в личке или группе, чтобы испытать удачу."
+    else:
+        text = get_private_start_text(user.full_name, False)
+
+    await callback.message.edit_text(
+        text,
+        reply_markup=get_main_menu_keyboard(user.id),
+        parse_mode='HTML'
+    )
+    await callback.answer()
 
 @common_router.message(Command("id"))
 async def cmd_id(message: Message):

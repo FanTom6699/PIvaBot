@@ -180,9 +180,28 @@ async def cmd_top(message: Message, bot: Bot, db: Database):
     await message.answer(top_text, parse_mode='HTML')
 
 
-# --- (ТВОЯ НОВАЯ КОМАНДА /start, КОТОРАЯ БЫЛА В user_commands.py) ---
-@user_commands_router.message(Command("start"))
-async def cmd_start(message: Message, bot: Bot, db: Database):
+@user_commands_router.message(Command("me"))
+async def cmd_me(message: Message, bot: Bot, db: Database):
+    if message.chat.type != 'private' and not await check_user_registered(message, bot, db):
+        return
+
+    user = message.from_user
+    await db.add_user(user.id, user.first_name, user.last_name, user.username)
+    rating = await db.get_user_beer_rating(user.id)
+    rank = await db.get_user_rank(user.id)
+    rank_text = f"#{rank['rank']}" if rank else "—"
+
+    text = (
+        f"🍺 <b>{html.quote(user.full_name)}</b>\n\n"
+        f"Рейтинг: {rating} 🍺\n"
+        f"Место: {rank_text}"
+    )
+    await message.answer(text, parse_mode='HTML')
+
+
+# --- ПРОФИЛЬ ---
+@user_commands_router.message(Command("profile"))
+async def cmd_profile(message: Message, bot: Bot, db: Database):
     user = message.from_user
     
     # (Регистрируем или обновляем инфо)
