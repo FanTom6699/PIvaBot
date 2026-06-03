@@ -42,6 +42,18 @@ def get_back_to_menu_keyboard() -> InlineKeyboardMarkup:
     ]])
 
 
+def get_profile_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="🌾 Ферма", callback_data=f"farm:main_dashboard:{user_id}"),
+            InlineKeyboardButton(text="🏆 Топ", callback_data=MainMenuCallback(action="top").pack()),
+        ],
+        [
+            InlineKeyboardButton(text="⬅️ Назад в меню", callback_data=MainMenuCallback(action="home").pack())
+        ],
+    ])
+
+
 def get_private_start_text(user_name: str, is_new: bool) -> str:
     user_name = escape(user_name)
     if is_new:
@@ -61,21 +73,76 @@ def get_private_start_text(user_name: str, is_new: bool) -> str:
     )
 
 
+def get_beer_status(last_beer_time: datetime | None, settings: SettingsManager | None) -> str:
+    if last_beer_time and settings:
+        time_passed = datetime.now() - last_beer_time
+        if time_passed.total_seconds() < settings.beer_cooldown:
+            time_left = timedelta(seconds=settings.beer_cooldown) - time_passed
+            return f"через {format_time_delta(time_left)}"
+    return "готово"
+
+
+async def get_farm_profile_status(user_id: int, db: Database, show_inventory: bool = False) -> str:
+    farm = await db.get_user_farm_data(user_id)
+    inventory = await db.get_user_inventory(user_id)
+    plots = await db.get_user_plots(user_id)
+    now = datetime.now()
+
+    ready_plots = 0
+    growing_plots = 0
+    for _, _, ready_time in plots:
+        try:
+            ready_dt = datetime.fromisoformat(ready_time) if isinstance(ready_time, str) else ready_time
+        except ValueError:
+            continue
+
+        if ready_dt and now >= ready_dt:
+            ready_plots += 1
+        elif ready_dt:
+            growing_plots += 1
+
+    batch_timer = farm.get("brewery_batch_timer_end")
+    if batch_timer and now >= batch_timer:
+        brewery_status = "партия готова"
+    elif batch_timer:
+        brewery_status = f"варится {format_time_delta(batch_timer - now)}"
+    else:
+        brewery_status = "свободна"
+
+    field_upgrade = farm.get("field_upgrade_timer_end")
+    brewery_upgrade = farm.get("brewery_upgrade_timer_end")
+    upgrade_lines = []
+    if field_upgrade and now < field_upgrade:
+        upgrade_lines.append(f"Поле улучшается: <b>{format_time_delta(field_upgrade - now)}</b>")
+    if brewery_upgrade and now < brewery_upgrade:
+        upgrade_lines.append(f"Пивоварня улучшается: <b>{format_time_delta(brewery_upgrade - now)}</b>")
+
+    lines = [
+        f"Поле: ур. <b>{farm.get('field_level', 1)}</b>",
+        f"Пивоварня: ур. <b>{farm.get('brewery_level', 1)}</b>",
+        f"Грядки: <b>{ready_plots}</b> готово / <b>{growing_plots}</b> растет",
+        f"Варка: <b>{brewery_status}</b>",
+    ]
+
+    if upgrade_lines:
+        lines.extend(upgrade_lines)
+
+    if show_inventory:
+        lines.append(
+            f"Склад: <b>{inventory.get('зерно', 0)}</b> 🌾 / <b>{inventory.get('хмель', 0)}</b> 🌱"
+        )
+
+    return "\n".join(lines)
+
+
 async def get_profile_text(user_id: int, user_name: str, db: Database, settings: SettingsManager | None = None) -> str:
     user_name = escape(user_name)
     profile = await db.get_user_profile(user_id)
     rating = profile[3] if profile else 0
     rank = await db.get_user_rank(user_id)
     rank_text = f"#{rank['rank']}" if rank else "—"
-    farm = await db.get_user_farm_data(user_id)
-    inventory = await db.get_user_inventory(user_id)
-    last_beer_time = await db.get_last_beer_time(user_id)
-    beer_status = "готово"
-    if last_beer_time and settings:
-        time_passed = datetime.now() - last_beer_time
-        if time_passed.total_seconds() < settings.beer_cooldown:
-            time_left = timedelta(seconds=settings.beer_cooldown) - time_passed
-            beer_status = f"через {format_time_delta(time_left)}"
+    beer_status = get_beer_status(await db.get_last_beer_time(user_id), settings)
+    farm_status = await get_farm_profile_status(user_id, db, show_inventory=True)
 
     return (
         f"👤 <b>Профиль</b>\n\n"
@@ -86,9 +153,28 @@ async def get_profile_text(user_id: int, user_name: str, db: Database, settings:
         f"Место: <b>{rank_text}</b>\n\n"
         f"🍺 <b>Бар:</b> {beer_status}\n\n"
         f"🌾 <b>Ферма</b>\n"
-        f"Поле: ур. <b>{farm.get('field_level', 1)}</b>\n"
-        f"Пивоварня: ур. <b>{farm.get('brewery_level', 1)}</b>\n"
-        f"Склад: <b>{inventory.get('зерно', 0)}</b> 🌾 / <b>{inventory.get('хмель', 0)}</b> 🌱"
+        f"{farm_status}\n\n"
+        f"{DIVIDER}\n"
+        "<i>В группе можно быстро смотреть себя через /me.</i>"
+    )
+
+
+async def get_compact_profile_text(user_id: int, user_name: str, db: Database, settings: SettingsManager | None = None) -> str:
+    user_name = escape(user_name)
+    profile = await db.get_user_profile(user_id)
+    rating = profile[3] if profile else 0
+    rank = await db.get_user_rank(user_id)
+    rank_text = f"#{rank['rank']}" if rank else "—"
+    beer_status = get_beer_status(await db.get_last_beer_time(user_id), settings)
+    farm_status = await get_farm_profile_status(user_id, db, show_inventory=False)
+
+    return (
+        f"👤 <b>{user_name}</b>\n\n"
+        f"Статус: <b>{get_rating_title(rating)}</b>\n"
+        f"Место в топе: <b>{rank_text}</b>\n"
+        f"Бар: <b>{beer_status}</b>\n\n"
+        f"🌾 <b>Ферма</b>\n"
+        f"{farm_status}"
     )
 
 
@@ -261,7 +347,7 @@ async def cq_main_menu(callback: CallbackQuery, callback_data: MainMenuCallback,
         keyboard = get_main_menu_keyboard(user.id)
     elif callback_data.action == "profile":
         text = await get_profile_text(user.id, user.full_name, db, settings)
-        keyboard = get_back_to_menu_keyboard()
+        keyboard = get_profile_keyboard(user.id)
     elif callback_data.action == "top":
         text = await get_top_text(db, user.id)
         keyboard = get_back_to_menu_keyboard()

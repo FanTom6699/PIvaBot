@@ -6,7 +6,13 @@ from aiogram.filters import Command
 from database import Database
 from settings import SettingsManager
 from .beer_service import run_beer_attempt
-from .common import check_user_registered, get_profile_text, get_top_text
+from .common import (
+    check_user_registered,
+    get_compact_profile_text,
+    get_profile_keyboard,
+    get_profile_text,
+    get_top_text,
+)
 
 # --- ИНИЦИАЛИЗАЦИЯ --
 user_commands_router = Router()
@@ -52,8 +58,12 @@ async def cmd_me(message: Message, bot: Bot, db: Database, settings: SettingsMan
 
     user = message.from_user
     await db.add_user(user.id, user.first_name, user.last_name, user.username)
-    text = await get_profile_text(user.id, user.full_name, db, settings)
-    await message.answer(text, parse_mode='HTML')
+    if message.chat.type == 'private':
+        text = await get_profile_text(user.id, user.full_name, db, settings)
+        await message.answer(text, reply_markup=get_profile_keyboard(user.id), parse_mode='HTML')
+    else:
+        text = await get_compact_profile_text(user.id, user.full_name, db, settings)
+        await message.answer(text, parse_mode='HTML')
 
 
 # --- ПРОФИЛЬ ---
@@ -61,5 +71,9 @@ async def cmd_me(message: Message, bot: Bot, db: Database, settings: SettingsMan
 async def cmd_profile(message: Message, bot: Bot, db: Database, settings: SettingsManager):
     user = message.from_user
     await db.add_user(user.id, user.first_name, user.last_name, user.username)
-    text = await get_profile_text(user.id, user.full_name, db, settings)
-    await message.answer(text, parse_mode='HTML')
+    if message.chat.type == 'private':
+        text = await get_profile_text(user.id, user.full_name, db, settings)
+        await message.answer(text, reply_markup=get_profile_keyboard(user.id), parse_mode='HTML')
+    else:
+        text = await get_compact_profile_text(user.id, user.full_name, db, settings)
+        await message.answer(text, parse_mode='HTML')
