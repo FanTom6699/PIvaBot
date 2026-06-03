@@ -43,15 +43,7 @@ def get_back_to_menu_keyboard() -> InlineKeyboardMarkup:
 
 
 def get_profile_keyboard(user_id: int) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="🌾 Ферма", callback_data=f"farm:main_dashboard:{user_id}"),
-            InlineKeyboardButton(text="🏆 Топ", callback_data=MainMenuCallback(action="top").pack()),
-        ],
-        [
-            InlineKeyboardButton(text="⬅️ Назад в меню", callback_data=MainMenuCallback(action="home").pack())
-        ],
-    ])
+    return get_back_to_menu_keyboard()
 
 
 def get_private_start_text(user_name: str, is_new: bool) -> str:
