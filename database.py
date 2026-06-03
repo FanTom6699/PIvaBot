@@ -446,11 +446,22 @@ class Database:
 
     async def start_upgrade(self, user_id: int, building: str, end_time: datetime, cost: int):
         """Запуск улучшения (building = 'field' или 'brewery')."""
+        if building not in {"field", "brewery"}:
+            raise ValueError("Unknown upgrade building")
+
         # Списание средств
         await self.change_rating(user_id, -cost)
-        
+
+        level_col = f"{building}_level"
         col_name = f"{building}_upgrade_timer_end"
         async with aiosqlite.connect(self.db_name) as db:
+            cursor = await db.execute(
+                f"SELECT {level_col} FROM user_farm_data WHERE user_id = ?",
+                (user_id,)
+            )
+            row = await cursor.fetchone()
+            next_level = (row[0] if row else 1) + 1
+
             await db.execute(
                 f"UPDATE user_farm_data SET {col_name} = ? WHERE user_id = ?",
                 (end_time.isoformat(), user_id)
@@ -458,7 +469,7 @@ class Database:
             # Добавляем уведомление
             await db.execute(
                 "INSERT INTO farm_notifications (user_id, task_type, data_json) VALUES (?, ?, ?)",
-                (user_id, f"{building}_upgrade", str(int(end_time.timestamp())))
+                (user_id, f"{building}_upgrade", str(next_level))
             )
             await db.commit()
 

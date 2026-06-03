@@ -29,6 +29,27 @@ if not BOT_TOKEN:
 # ─────────────────────────────────────────────
 # Фоновая задача фермы
 # ─────────────────────────────────────────────
+def format_farm_notification(task_type: str, data: int | None) -> str | None:
+    if task_type == "batch":
+        batch_text = f"Партия: <b>x{data}</b>\n" if data and 0 < data < 1000 else ""
+        return (
+            "🏭 <b>Пивоварня</b>\n\n"
+            "Твоя варка готова к сбору.\n\n"
+            f"{batch_text}"
+            "Зайди на ферму и забери награду."
+        )
+
+    if task_type == "field_upgrade":
+        level_text = f"\nНовый уровень: <b>{data}</b>" if data and 0 < data < 100 else ""
+        return f"🌾 <b>Поле</b>\n\nУлучшение завершено.{level_text}"
+
+    if task_type == "brewery_upgrade":
+        level_text = f"\nНовый уровень: <b>{data}</b>" if data and 0 < data < 100 else ""
+        return f"🏭 <b>Пивоварня</b>\n\nУлучшение завершено.{level_text}"
+
+    return None
+
+
 async def farm_background_updater(bot: Bot, db: Database):
     logging.info("Фоновая задача (Farm Updater) запущена...")
 
@@ -45,20 +66,7 @@ async def farm_background_updater(bot: Bot, db: Database):
             logging.info(f"[Farm Updater] Найдено {len(pending_tasks)} задач")
 
             for user_id, task_type, data in pending_tasks:
-                text = None
-
-                if task_type == "batch":
-                    batch_text = f"Партия: <b>x{data}</b>\n" if data and data > 0 else ""
-                    text = (
-                        "🏭 <b>Пивоварня</b>\n\n"
-                        "Твоя варка готова к сбору.\n\n"
-                        f"{batch_text}"
-                        "Зайди на ферму и забери награду."
-                    )
-                elif task_type == "field_upgrade":
-                    text = "🌾 <b>Поле</b>\n\nУлучшение завершено."
-                elif task_type == "brewery_upgrade":
-                    text = "🏭 <b>Пивоварня</b>\n\nУлучшение завершено."
+                text = format_farm_notification(task_type, data)
 
                 if task_type == "field_upgrade":
                     await db.finish_upgrade(user_id, "field")
