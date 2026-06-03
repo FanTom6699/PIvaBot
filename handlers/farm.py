@@ -79,6 +79,37 @@ def get_farm_help_text() -> str:
         "• Если что-то готово, ферма обычно подскажет это на главном экране."
     )
 
+
+def format_order_reward(order: dict) -> str:
+    if order['reward_type'] == 'beer':
+        return f"+{order['reward_amount']} 🍺"
+    if order['reward_type'] == 'item':
+        item_name = FARM_ITEM_NAMES.get(order['reward_id'], order['reward_id'])
+        return f"+{order['reward_amount']} {item_name}"
+    return "Награда"
+
+
+def format_order_block(slot_id: int, order: dict, inventory: dict, is_completed: int) -> str:
+    item_name = FARM_ITEM_NAMES.get(order['item_id'], order['item_id'])
+    needed = order['item_amount']
+    available = inventory.get(order['item_id'], 0)
+    progress = min(available, needed)
+    reward_text = format_order_reward(order)
+
+    if is_completed:
+        status = "✅ Выполнено"
+    elif available >= needed:
+        status = "🟢 Можно сдать"
+    else:
+        status = "🔴 Не хватает"
+
+    return (
+        f"\n<b>{slot_id}. {order['text']}</b>\n"
+        f"{status}\n"
+        f"Нужно: <b>{progress}/{needed}</b> {item_name}\n"
+        f"Награда: <b>{reward_text}</b>\n"
+    )
+
 # --- ✅ CALLBACK DATA (РАЗДЕЛЕННЫЕ) ---
 
 # 1. Обычные кнопки (чтобы не висли)
@@ -400,25 +431,25 @@ async def cq_farm_orders_menu(callback: CallbackQuery, db: Database, callback_da
         orders = await db.get_user_orders(user_id)
         inventory = await db.get_user_inventory(user_id)
         
-        text = "<b>📋 Доска Заказов</b>\nПоручения от бармена. Обновляются раз в 24 часа.\n"
+        text = (
+            "📋 <b>Доска заказов</b>\n\n"
+            "Бармен оставил поручения на сегодня.\n"
+            "Заказы обновляются раз в 24 часа.\n\n"
+            "<code>--- --- ---</code>\n"
+        )
         buttons = []
-        
+
         for slot_id, order_id, is_completed in orders:
             if order_id not in FARM_ORDER_POOL: continue
             order = FARM_ORDER_POOL[order_id]
-            reward_text = f"+{order['reward_amount']} 🍺" if order['reward_type'] == 'beer' else "Предметы"
-            
-            if is_completed:
-                text += f"\n✅ <s>{order['text']}</s> (Выполнено)\n"
-            else:
+            reward_text = format_order_reward(order)
+            text += format_order_block(slot_id, order, inventory, is_completed)
+
+            if not is_completed:
                 has_items = inventory.get(order['item_id'], 0) >= order['item_amount']
                 if has_items:
-                    text += f"\n➡️ <b>{order['text']}</b>\n"
-                    # ✅ OrderCallback
                     cb = OrderCallback(action="complete", owner_id=user_id, slot_id=slot_id, order_id=order_id).pack()
-                    buttons.append(InlineKeyboardButton(text=f"✅ Сдать ({reward_text})", callback_data=cb))
-                else:
-                    text += f"\n❌ {order['text']} (Не хватает ресурсов)\n"
+                    buttons.append(InlineKeyboardButton(text=f"✅ Сдать {slot_id} ({reward_text})", callback_data=cb))
 
         kb_rows = [[btn] for btn in buttons]
         kb_rows.append(back_btn_to_farm(user_id))
@@ -449,10 +480,10 @@ async def cq_farm_order_complete(callback: CallbackQuery, db: Database, callback
         msg = ""
         if order['reward_type'] == 'beer':
             await db.change_rating(user_id, order['reward_amount'])
-            msg = f"+{order['reward_amount']} 🍺"
+            msg = format_order_reward(order)
         elif order['reward_type'] == 'item':
             await db.modify_inventory(user_id, order['reward_id'], order['reward_amount'])
-            msg = f"+Предметы"
+            msg = format_order_reward(order)
 
         await callback.answer(f"Заказ выполнен! {msg}", show_alert=True)
         await cq_farm_orders_menu(callback, db, FarmCallback(action="orders_menu", owner_id=user_id))
