@@ -95,66 +95,53 @@ def get_level_data(level: int, upgrade_data: dict) -> dict:
         data['next_time_h'] = next_level_data.get('time_h')
     return data
 
-# --- ✅✅✅ НОВЫЙ КОД: ДОСКА ЗАКАЗОВ ✅✅✅ ---
-# Пул всех заданий, из которых бот будет выбирать 3.
+# --- ДОСКА ЗАКАЗОВ ---
+# Заказы считаются так, чтобы игрок выбирал: сдать сырье бармену или пустить его в варку.
 FARM_ORDER_POOL = {
-    # (Заказы на Зерно)
     'grain_10': {
-        'text': "Нужно 10 🌾 Зерна на закуску", 
-        'item_id': 'зерно', 'item_amount': 10, 
-        'reward_type': 'beer', 'reward_amount': 30
+        'text': "Мешок солода: 10 🌾 Зерна",
+        'items': {'зерно': 10},
+        'reward_type': 'beer', 'reward_amount': 25
     },
     'grain_25': {
-        'text': "Заказ на 25 🌾 Зерна", 
-        'item_id': 'зерно', 'item_amount': 25, 
-        'reward_type': 'beer', 'reward_amount': 80
+        'text': "Поставка к стойке: 25 🌾 Зерна",
+        'items': {'зерно': 25},
+        'reward_type': 'beer', 'reward_amount': 70
     },
-    'grain_50': {
-        'text': "Крупная поставка: 50 🌾 Зерна", 
-        'item_id': 'зерно', 'item_amount': 50, 
-        'reward_type': 'beer', 'reward_amount': 175
+    'hops_6': {
+        'text': "Ароматная партия: 6 🌱 Хмеля",
+        'items': {'хмель': 6},
+        'reward_type': 'beer', 'reward_amount': 38
     },
-    
-    # (Заказы на Хмель)
-    'hops_10': {
-        'text': "Нужно 10 🌱 Хмеля для аромата", 
-        'item_id': 'хмель', 'item_amount': 10, 
-        'reward_type': 'beer', 'reward_amount': 50
+    'hops_15': {
+        'text': "Хмельной запас: 15 🌱 Хмеля",
+        'items': {'хмель': 15},
+        'reward_type': 'beer', 'reward_amount': 95
     },
-    'hops_25': {
-        'text': "Заказ на 25 🌱 Хмеля", 
-        'item_id': 'хмель', 'item_amount': 25, 
-        'reward_type': 'beer', 'reward_amount': 130
+    'brew_1': {
+        'text': "Набор для варки: 5 🌾 + 3 🌱",
+        'items': {'зерно': 5, 'хмель': 3},
+        'reward_type': 'beer', 'reward_amount': 42
     },
-    'hops_50': {
-        'text': "Крупная поставка: 50 🌱 Хмеля", 
-        'item_id': 'хмель', 'item_amount': 50, 
-        'reward_type': 'beer', 'reward_amount': 280
+    'brew_2': {
+        'text': "Двойная варка: 10 🌾 + 6 🌱",
+        'items': {'зерно': 10, 'хмель': 6},
+        'reward_type': 'beer', 'reward_amount': 90
     },
-    
-    # (Заказы на Семена - награда 🍺)
-    'seed_g_5': {
-        'text': "Нужны 5 Семян 🌾 Зерна", 
-        'item_id': 'семя_зерна', 'item_amount': 5, 
-        'reward_type': 'beer', 'reward_amount': 20
+    'brew_big': {
+        'text': "Большой вечер: 25 🌾 + 15 🌱",
+        'items': {'зерно': 25, 'хмель': 15},
+        'reward_type': 'beer', 'reward_amount': 240
     },
-    'seed_h_3': {
-        'text': "Нужны 3 Семя 🌱 Хмеля", 
-        'item_id': 'семя_хмеля', 'item_amount': 3, 
-        'reward_type': 'beer', 'reward_amount': 30
+    'starter_grain': {
+        'text': "Вернуть семена: 5 семян 🌾",
+        'items': {'семя_зерна': 5},
+        'reward_type': 'beer', 'reward_amount': 12
     },
-    
-    # (Обмен Зерна на Семена Хмеля)
-    'trade_g_h': {
-        'text': "Обмен: 30 🌾 Зерна на Семена", 
-        'item_id': 'зерно', 'item_amount': 30, 
-        'reward_type': 'item', 'reward_id': 'семя_хмеля', 'reward_amount': 2
-    },
-    # (Обмен Хмеля на Семена Зерна)
-    'trade_h_g': {
-        'text': "Обмен: 15 🌱 Хмеля на Семена", 
-        'item_id': 'хмель', 'item_amount': 15, 
-        'reward_type': 'item', 'reward_id': 'семя_зерна', 'reward_amount': 5
+    'starter_hops': {
+        'text': "Вернуть семена: 3 семени 🌱",
+        'items': {'семя_хмеля': 3},
+        'reward_type': 'beer', 'reward_amount': 12
     }
 }
 

@@ -478,7 +478,7 @@ class Database:
 
     async def check_and_reset_orders(self, user_id: int):
         """Проверяет, прошло ли 24 часа. Если да - удаляет старые заказы."""
-        from handlers.farm_config import get_random_orders # Импорт внутри, чтобы избежать цикличности
+        from handlers.farm_config import FARM_ORDER_POOL, get_random_orders # Импорт внутри, чтобы избежать цикличности
         
         now = datetime.now()
         
@@ -493,6 +493,12 @@ class Database:
             else:
                 last_reset = datetime.fromisoformat(row[0])
                 if now - last_reset > timedelta(hours=24):
+                    need_reset = True
+
+            if not need_reset:
+                cursor = await db.execute("SELECT order_id FROM user_orders WHERE user_id = ?", (user_id,))
+                current_orders = await cursor.fetchall()
+                if len(current_orders) < 3 or any(order_id not in FARM_ORDER_POOL for (order_id,) in current_orders):
                     need_reset = True
             
             if need_reset:
