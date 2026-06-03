@@ -48,11 +48,17 @@ async def farm_background_updater(bot: Bot, db: Database):
                 text = None
 
                 if task_type == "batch":
-                    text = f"🍻 Твоя варка (x{data}) готова! Забери награду!"
+                    batch_text = f"Партия: <b>x{data}</b>\n" if data and data > 0 else ""
+                    text = (
+                        "🏭 <b>Пивоварня</b>\n\n"
+                        "Твоя варка готова к сбору.\n\n"
+                        f"{batch_text}"
+                        "Зайди на ферму и забери награду."
+                    )
                 elif task_type == "field_upgrade":
-                    text = "🌾 Улучшение Поля завершено!"
+                    text = "🌾 <b>Поле</b>\n\nУлучшение завершено."
                 elif task_type == "brewery_upgrade":
-                    text = "🏭 Улучшение Пивоварни завершено!"
+                    text = "🏭 <b>Пивоварня</b>\n\nУлучшение завершено."
 
                 if task_type == "field_upgrade":
                     await db.finish_upgrade(user_id, "field")

@@ -49,7 +49,8 @@ async def farm_background_updater(bot: Bot, db: Database):
 
                     elif task_type == 'batch':
                         quantity = data
-                        text = f"🏆 Ваша варка ({quantity}x) в [🏭 Пивоварне] готова к сбору!"
+                        batch_text = f"\nПартия: <b>x{quantity}</b>" if quantity and quantity > 0 else ""
+                        text = f"🏭 <b>Пивоварня</b>\n\nТвоя варка готова к сбору.{batch_text}"
                     
                     if text:
                         with suppress(TelegramBadRequest): # (Если юзер забанил бота)

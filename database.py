@@ -430,7 +430,7 @@ class Database:
             # Добавляем уведомление
             await db.execute(
                 "INSERT INTO farm_notifications (user_id, task_type, data_json) VALUES (?, ?, ?)",
-                (user_id, 'batch', str(int(end_time.timestamp())))
+                (user_id, 'batch', str(batch_size))
             )
             await db.commit()
 
@@ -572,7 +572,7 @@ class Database:
             brewery_tasks = await cursor_brewery.fetchall()
             
             cursor_batch = await db.execute(
-                "SELECT T1.user_id, T1.task_type, T1.data_json FROM farm_notifications T1 "
+                "SELECT T1.user_id, T1.task_type, T2.brewery_batch_size FROM farm_notifications T1 "
                 "JOIN user_farm_data T2 ON T1.user_id = T2.user_id "
                 "WHERE T1.task_type = 'batch' AND T1.is_sent = 0 AND T2.brewery_batch_timer_end <= ?",
                 (now.isoformat(),)
