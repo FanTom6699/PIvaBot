@@ -104,7 +104,7 @@ async def run_beer_attempt(user_id: int, db: Database, settings: SettingsManager
             "🍺 <b>Барная попытка</b>\n\n"
             f"{random.choice(BEER_WIN_LINES)}\n\n"
             f"{DIVIDER}\n"
-            f"Итог: <b>+{rating_change}</b> 🍺"
+            f"<b>+{rating_change}</b> 🍺"
         )
     else:
         current_rating = await db.get_user_beer_rating(user_id)
@@ -115,7 +115,7 @@ async def run_beer_attempt(user_id: int, db: Database, settings: SettingsManager
                 "🍺 <b>Барная попытка</b>\n\n"
                 f"{random.choice(BEER_LOSE_LINES)}\n\n"
                 f"{DIVIDER}\n"
-                f"Итог: <b>{rating_change}</b> 🍺"
+                f"<b>{rating_change}</b> 🍺"
             )
         else:
             rating_change = random.randint(1, 3)
@@ -123,7 +123,7 @@ async def run_beer_attempt(user_id: int, db: Database, settings: SettingsManager
                 "🍺 <b>Барная попытка</b>\n\n"
                 f"{random.choice(BEER_ZERO_LINES)}\n\n"
                 f"{DIVIDER}\n"
-                f"Итог: <b>+{rating_change}</b> 🍺"
+                f"<b>+{rating_change}</b> 🍺"
             )
 
     if rating_change != 0:
