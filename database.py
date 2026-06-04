@@ -87,6 +87,15 @@ class Database:
                     last_reset_time TEXT
                 )
             ''')
+            await db.execute('''
+                CREATE TABLE IF NOT EXISTS user_shop_purchases (
+                    user_id INTEGER,
+                    item_id TEXT,
+                    bought_count INTEGER DEFAULT 0,
+                    purchase_date TEXT,
+                    PRIMARY KEY (user_id, item_id)
+                )
+            ''')
 
             # --- ТАБЛИЦА МАФИИ ---
             await db.execute('''
@@ -386,6 +395,41 @@ class Database:
             )
             await db.commit()
         return True
+
+    async def get_shop_purchase_count(self, user_id: int, item_id: str, today: str | None = None) -> int:
+        today = today or datetime.now().date().isoformat()
+        async with aiosqlite.connect(self.db_name) as db:
+            cursor = await db.execute(
+                "SELECT bought_count, purchase_date FROM user_shop_purchases WHERE user_id = ? AND item_id = ?",
+                (user_id, item_id)
+            )
+            row = await cursor.fetchone()
+            if not row:
+                return 0
+
+            bought_count, purchase_date = row
+            if purchase_date != today:
+                await db.execute(
+                    "UPDATE user_shop_purchases SET bought_count = 0, purchase_date = ? WHERE user_id = ? AND item_id = ?",
+                    (today, user_id, item_id)
+                )
+                await db.commit()
+                return 0
+
+            return bought_count or 0
+
+    async def add_shop_purchase(self, user_id: int, item_id: str, quantity: int, today: str | None = None):
+        today = today or datetime.now().date().isoformat()
+        current_count = await self.get_shop_purchase_count(user_id, item_id, today)
+        async with aiosqlite.connect(self.db_name) as db:
+            await db.execute(
+                """
+                INSERT OR REPLACE INTO user_shop_purchases (user_id, item_id, bought_count, purchase_date)
+                VALUES (?, ?, ?, ?)
+                """,
+                (user_id, item_id, current_count + quantity, today)
+            )
+            await db.commit()
 
     # --- ФЕРМА (ДЕЙСТВИЯ) ---
 
