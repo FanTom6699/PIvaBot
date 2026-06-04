@@ -13,6 +13,7 @@ from .farm import FarmCallback, check_owner, back_btn_to_farm
 from .farm_config import SHOP_DAILY_LIMITS, SHOP_PRICES, FARM_ITEM_NAMES
 
 shop_router = Router()
+DIVIDER = "<code>--- --- ---</code>"
 
 class ShopCallback(CallbackData, prefix="shop_buy"):
     action: str
@@ -62,16 +63,15 @@ async def get_shop_menu(user_id: int, db: Database, owner_id: int) -> (str, Inli
     remaining_h = max(0, limit_h - bought_h)
 
     text = (
-        f"🏪 <b>МАГАЗИН</b>\n"
-        f"<code>══════════════════</code>\n"
-        f"Баланс: <b>{balance} 🍺</b>\n"
-        f"<code>══════════════════</code>\n\n"
-        f"<i>Семена продаются дневным запасом, чтобы ферма не превращалась в бесконечную печатню.</i>\n\n"
+        f"🏪 <b>Магазин</b>\n\n"
+        f"Баланс: <b>{balance}</b> 🍺\n"
+        "Семена продаются дневным запасом.\n\n"
+        f"{DIVIDER}\n"
 
         f"🌾 <b>{FARM_ITEM_NAMES[item_g]}</b>\n"
-        f"• Цена: <code>{price_g} 🍺</code>\n"
-        f"• На складе: <code>{stock_g} шт.</code>\n"
-        f"• Сегодня: <code>{bought_g}/{limit_g}</code> куплено, осталось <code>{remaining_g}</code>"
+        f"Цена: <b>{price_g}</b> 🍺\n"
+        f"Склад: <b>{stock_g}</b>\n"
+        f"Лимит: <b>{bought_g}/{limit_g}</b>, осталось <b>{remaining_g}</b>"
     )
 
     kb = []
@@ -81,9 +81,9 @@ async def get_shop_menu(user_id: int, db: Database, owner_id: int) -> (str, Inli
 
     text += (
         f"\n\n🌱 <b>{FARM_ITEM_NAMES[item_h]}</b>\n"
-        f"• Цена: <code>{price_h} 🍺</code>\n"
-        f"• На складе: <code>{stock_h} шт.</code>\n"
-        f"• Сегодня: <code>{bought_h}/{limit_h}</code> куплено, осталось <code>{remaining_h}</code>"
+        f"Цена: <b>{price_h}</b> 🍺\n"
+        f"Склад: <b>{stock_h}</b>\n"
+        f"Лимит: <b>{bought_h}/{limit_h}</b>, осталось <b>{remaining_h}</b>"
     )
 
     hops_buttons = get_buy_buttons(item_h, "🌱", remaining_h, owner_id)
