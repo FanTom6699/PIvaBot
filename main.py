@@ -53,13 +53,13 @@ def format_farm_notification(task_type: str, data: int | None) -> str | None:
 
 async def setup_bot_commands(bot: Bot):
     await bot.set_my_commands([
-        BotCommand(command="start", description="Открыть главное меню"),
-        BotCommand(command="beer", description="Выпить и испытать удачу"),
-        BotCommand(command="me", description="Краткий профиль игрока"),
-        BotCommand(command="farm", description="Открыть ферму"),
-        BotCommand(command="top", description="Топ игроков бара"),
-        BotCommand(command="jackpot", description="Общий банк удачи"),
-        BotCommand(command="help", description="Помощь и правила"),
+        BotCommand(command="start", description="🍺 Главное меню бара"),
+        BotCommand(command="beer", description="🍻 Выпить и испытать удачу"),
+        BotCommand(command="me", description="👤 Мой краткий профиль"),
+        BotCommand(command="farm", description="🌾 Ферма и пивоварня"),
+        BotCommand(command="top", description="🏆 Топ игроков бара"),
+        BotCommand(command="jackpot", description="🎁 Общий банк удачи"),
+        BotCommand(command="help", description="❓ Помощь и правила"),
     ])
 
 
