@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from aiogram.types import BotCommand
 
 from handlers import main_router
 
@@ -48,6 +49,18 @@ def format_farm_notification(task_type: str, data: int | None) -> str | None:
         return f"🏭 <b>Пивоварня</b>\n\nУлучшение завершено.{level_text}"
 
     return None
+
+
+async def setup_bot_commands(bot: Bot):
+    await bot.set_my_commands([
+        BotCommand(command="start", description="Открыть главное меню"),
+        BotCommand(command="beer", description="Выпить и испытать удачу"),
+        BotCommand(command="me", description="Краткий профиль игрока"),
+        BotCommand(command="farm", description="Открыть ферму"),
+        BotCommand(command="top", description="Топ игроков бара"),
+        BotCommand(command="jackpot", description="Общий банк удачи"),
+        BotCommand(command="help", description="Помощь и правила"),
+    ])
 
 
 async def farm_background_updater(bot: Bot, db: Database):
@@ -124,6 +137,8 @@ async def main():
 
     # Роутеры
     dp.include_router(main_router)
+
+    await setup_bot_commands(bot)
 
     # Фоновые задачи
     asyncio.create_task(farm_background_updater(bot, db))
