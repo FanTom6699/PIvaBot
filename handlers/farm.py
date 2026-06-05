@@ -193,7 +193,7 @@ async def get_farm_dashboard(user_id: int, user_name: str, db: Database) -> (str
     
     brewery_status_text = ""
     brew_upgrade_timer = farm.get('brewery_upgrade_timer_end')
-    batch_timer = farm.get('brewery_batch_timer_end') 
+    batch_timer = farm.get('brewery_batch_timer_end')
 
     if brew_upgrade_timer and now < brew_upgrade_timer:
         left = format_time_delta(brew_upgrade_timer - now)
@@ -291,7 +291,7 @@ async def get_farm_dashboard(user_id: int, user_name: str, db: Database) -> (str
         else:
             kb.append([InlineKeyboardButton(
                 text="🏭 Пивоварня · варится",
-                callback_data=FarmCallback(action="show_brew_time", owner_id=user_id).pack()
+                callback_data=BreweryCallback(action="brew_menu", owner_id=user_id).pack()
             )])
     else:
         kb.append([InlineKeyboardButton(text="🏭 Пивоварня", callback_data=BreweryCallback(action="brew_menu", owner_id=user_id).pack())])
@@ -606,7 +606,52 @@ async def cq_plot_time(callback: CallbackQuery):
 async def cq_brewery_menu(callback: CallbackQuery, callback_data: BreweryCallback, db: Database):
     if not await check_owner(callback, callback_data.owner_id): return
     uid = callback.from_user.id
+    farm = await db.get_user_farm_data(uid)
     inv = await db.get_user_inventory(uid)
+    stats = get_level_data(farm.get('brewery_level', 1), BREWERY_UPGRADES)
+    batch_timer = farm.get('brewery_batch_timer_end')
+    now = datetime.now()
+
+    btns = []
+    if batch_timer:
+        batch_size = farm.get('brewery_batch_size', 0)
+        reward = stats.get('reward', 0)
+        total_reward = reward * batch_size
+
+        if now >= batch_timer:
+            status_text = (
+                "Партия готова.\n"
+                f"Размер партии: <b>x{batch_size}</b>\n"
+                f"Награда: <b>+{total_reward}</b> 🍺"
+            )
+            btns.append(
+                InlineKeyboardButton(
+                    text=f"🏆 Забрать +{total_reward} 🍺",
+                    callback_data=BreweryCallback(action="collect", owner_id=uid).pack()
+                )
+            )
+        else:
+            left = format_time_delta(batch_timer - now)
+            status_text = (
+                "Партия сейчас варится.\n"
+                f"Размер партии: <b>x{batch_size}</b>\n"
+                f"Осталось: <b>{left}</b>"
+            )
+
+        text = (
+            "🏭 <b>Пивоварня</b>\n\n"
+            f"{status_text}\n\n"
+            f"{DIVIDER}\n"
+            "<i>Когда варка закончится, здесь появится кнопка сбора.</i>"
+        )
+
+        kb = rows(btns, 1)
+        kb.append(back_btn_to_farm(uid))
+        with suppress(TelegramBadRequest):
+            await callback.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+        await callback.answer()
+        return
+
     missing_grain = max(0, BREWERY_RECIPE['зерно'] - inv['зерно'])
     missing_hops = max(0, BREWERY_RECIPE['хмель'] - inv['хмель'])
     text = (
@@ -628,7 +673,6 @@ async def cq_brewery_menu(callback: CallbackQuery, callback_data: BreweryCallbac
         text += f"\n\n<i>Не хватает: {' / '.join(missing_parts)}</i>"
     
     can_brew = inv['зерно'] >= BREWERY_RECIPE['зерно'] and inv['хмель'] >= BREWERY_RECIPE['хмель']
-    btns = []
     if can_brew:
         btns.append(InlineKeyboardButton(text="🔥 Варить (1)", callback_data=BreweryCallback(action="brew_do", owner_id=uid, quantity=1).pack()))
     
