@@ -735,6 +735,9 @@ async def cq_farm_upgrades(callback: CallbackQuery, callback_data: FarmCallback,
     user_id = callback.from_user.id
     balance = await db.get_user_beer_rating(user_id)
     farm = await db.get_user_farm_data(user_id)
+    active_plots = await db.get_user_plots(user_id)
+    field_is_free = len(active_plots) == 0
+    brewery_is_free = not farm.get('brewery_batch_timer_end')
     
     text = (
         f"⭐ <b>Улучшения</b>\n\n"
@@ -764,7 +767,9 @@ async def cq_farm_upgrades(callback: CallbackQuery, callback_data: FarmCallback,
             f"x2 <b>{f_next.get('chance_x2', '??')}%</b>\n"
             f"Цена: <b>{cost}</b> 🍺 · Время: <b>{f_next['time_h']} ч</b>\n"
         )
-        if balance >= cost:
+        if not field_is_free:
+            text += "<i>Перед улучшением поле должно быть свободным.</i>\n"
+        if balance >= cost and field_is_free:
             buttons.append([InlineKeyboardButton(text="⬆️ Улучшить поле", callback_data=UpgradeCallback(action="buy_field", owner_id=user_id).pack())])
     
     text += "\n" # Разделитель
@@ -790,7 +795,9 @@ async def cq_farm_upgrades(callback: CallbackQuery, callback_data: FarmCallback,
             f"варка <b>{b_next.get('brew_time_min', '??')}м</b>\n"
             f"Цена: <b>{cost}</b> 🍺 · Время: <b>{b_next['time_h']} ч</b>\n"
         )
-        if balance >= cost:
+        if not brewery_is_free:
+            text += "<i>Перед улучшением пивоварня должна быть свободной.</i>\n"
+        if balance >= cost and brewery_is_free:
             buttons.append([InlineKeyboardButton(text="⬆️ Улучшить пивоварню", callback_data=UpgradeCallback(action="buy_brewery", owner_id=user_id).pack())])
 
     buttons.append(back_btn_to_farm(user_id))
@@ -801,14 +808,35 @@ async def cq_farm_upgrades(callback: CallbackQuery, callback_data: FarmCallback,
 @farm_router.callback_query(UpgradeCallback.filter(F.action.in_({"buy_field", "buy_brewery"})))
 async def cq_upgrade_confirm(callback: CallbackQuery, callback_data: UpgradeCallback, db: Database):
     if not await check_owner(callback, callback_data.owner_id): return
+    user_id = callback.from_user.id
     b_type = "field" if callback_data.action == "buy_field" else "brewery"
-    farm = await db.get_user_farm_data(callback.from_user.id)
+    farm = await db.get_user_farm_data(user_id)
+    now = datetime.now()
+
+    if b_type == "field":
+        if farm.get('field_upgrade_timer_end') and now < farm['field_upgrade_timer_end']:
+            return await callback.answer("⏳ Поле уже улучшается.", show_alert=True)
+        if await db.get_user_plots(user_id):
+            return await callback.answer("🌾 Сначала освободи поле: собери урожай или дождись роста.", show_alert=True)
+    else:
+        if farm.get('brewery_upgrade_timer_end') and now < farm['brewery_upgrade_timer_end']:
+            return await callback.answer("⏳ Пивоварня уже улучшается.", show_alert=True)
+        if farm.get('brewery_batch_timer_end'):
+            return await callback.answer("🏭 Сначала освободи пивоварню: дождись варки и забери партию.", show_alert=True)
+
     lvl = farm.get(f'{b_type}_level', 1)
+    current = get_level_data(lvl, FIELD_UPGRADES if b_type == 'field' else BREWERY_UPGRADES)
+    if current.get('max_level'):
+        return await callback.answer("⭐ Уже максимальный уровень.", show_alert=True)
+
     stats = get_level_data(lvl + 1, FIELD_UPGRADES if b_type == 'field' else BREWERY_UPGRADES)
-    
-    await db.start_upgrade(callback.from_user.id, b_type, datetime.now() + timedelta(hours=stats['time_h']), stats['cost'])
+    balance = await db.get_user_beer_rating(user_id)
+    if balance < stats['cost']:
+        return await callback.answer(f"⛔ Нужно {stats['cost']} 🍺.", show_alert=True)
+
+    await db.start_upgrade(user_id, b_type, now + timedelta(hours=stats['time_h']), stats['cost'])
     await callback.answer("Стройка началась!")
-    await cq_farm_main_dashboard(callback, FarmCallback(action="main_dashboard", owner_id=callback.from_user.id), db)
+    await cq_farm_main_dashboard(callback, FarmCallback(action="main_dashboard", owner_id=user_id), db)
 
 @farm_router.callback_query(FarmCallback.filter(F.action == "show_help"))
 async def cq_farm_help(callback: CallbackQuery, callback_data: FarmCallback):
