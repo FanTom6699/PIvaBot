@@ -621,7 +621,7 @@ async def cq_brewery_menu(callback: CallbackQuery, callback_data: BreweryCallbac
         if now >= batch_timer:
             status_text = (
                 "Партия готова.\n"
-                f"Размер партии: <b>x{batch_size}</b>\n"
+                f"Готово: 🍺 Пиво <b>x{batch_size}</b>\n"
                 f"Награда: <b>+{total_reward}</b> 🍺"
             )
             btns.append(
@@ -634,7 +634,7 @@ async def cq_brewery_menu(callback: CallbackQuery, callback_data: BreweryCallbac
             left = format_time_delta(batch_timer - now)
             status_text = (
                 "Партия сейчас варится.\n"
-                f"Размер партии: <b>x{batch_size}</b>\n"
+                f"Варится: 🍺 Пиво <b>x{batch_size}</b>\n"
                 f"Осталось: <b>{left}</b>"
             )
 
