@@ -4,6 +4,7 @@ import random
 from datetime import datetime, timedelta
 from contextlib import suppress
 import logging
+from decimal import Decimal, ROUND_HALF_UP
 from typing import List
 from html import escape
 
@@ -39,7 +40,7 @@ class LadderGameState:
         self.correct_path: List[int] = correct_path
         self.player_choices = {}
         self.current_level = 1
-        self.current_win = 0.0
+        self.current_win = 0
         self.is_finished = False
         self.last_choice = -1
         self.task = None
@@ -49,12 +50,12 @@ LADDER_INACTIVITY_TIMEOUT_SECONDS = 60
 active_ladder_games = {}
 
 LADDER_MULTIPLIERS = [1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 2.0, 2.2, 2.5]
-def calculate_ladder_rewards(stake: int) -> List[float]:
+def calculate_ladder_rewards(stake: int) -> List[int]:
     rewards = []
-    current_win = float(stake)
+    current_win = Decimal(stake)
     for i in range(LADDER_LEVELS):
-        current_win *= LADDER_MULTIPLIERS[i]
-        rewards.append(round(current_win, 2))
+        current_win *= Decimal(str(LADDER_MULTIPLIERS[i]))
+        rewards.append(int(current_win.to_integral_value(rounding=ROUND_HALF_UP)))
     return rewards
 
 # --- ФУНКЦИИ ИГРЫ ---
@@ -79,7 +80,7 @@ async def schedule_ladder_timeout(chat_id: int, player_id: int, message_id: int,
         if chat_id in active_ladder_games:
             del active_ladder_games[chat_id]
 
-async def generate_ladder_keyboard(game: LadderGameState, rewards: List[float], reveal: bool = False, is_win: bool = False) -> InlineKeyboardMarkup:
+async def generate_ladder_keyboard(game: LadderGameState, rewards: List[int], reveal: bool = False, is_win: bool = False) -> InlineKeyboardMarkup:
     keyboard = []
     for i in range(LADDER_LEVELS, 0, -1):
         level_idx = i - 1
@@ -171,8 +172,8 @@ async def end_ladder_game(bot: Bot, chat_id: int, user: User, game: LadderGameSt
     
     if is_win:
         win_amount = game.current_win if game.current_win > 0 else game.stake
-        await db.change_rating(game.player_id, int(win_amount))
-        text = f"🎉 <b>Победа в Лесенке!</b> 🎉\n\nИгрок: <b>{player_name}</b>\nЗабрал выигрыш: <b>+{int(win_amount)} 🍺</b>"
+        await db.change_rating(game.player_id, win_amount)
+        text = f"🎉 <b>Победа в Лесенке!</b> 🎉\n\nИгрок: <b>{player_name}</b>\nЗабрал выигрыш: <b>+{win_amount} 🍺</b>"
         final_board_text = await generate_final_board_text(game, rewards, is_win=True)
     else:
         text = f"💥 <b>Неудача в Лесенке!</b> 💥\n\nИгрок: <b>{player_name}</b>\nОшибка на Уровне {game.current_level}!\nСтавка <b>{game.stake} 🍺</b> сгорела."
@@ -183,7 +184,7 @@ async def end_ladder_game(bot: Bot, chat_id: int, user: User, game: LadderGameSt
     if game.chat_id in active_ladder_games:
         del active_ladder_games[game.chat_id]
 
-async def generate_final_board_text(game: LadderGameState, rewards: List[float], is_win: bool) -> str:
+async def generate_final_board_text(game: LadderGameState, rewards: List[int], is_win: bool) -> str:
     board_lines = ["<b>Ваш путь:</b>\n"]
     for i in range(LADDER_LEVELS, 0, -1):
         level_idx = i - 1
