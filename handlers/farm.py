@@ -323,20 +323,41 @@ async def get_plots_dashboard(user_id: int, db: Database) -> (str, InlineKeyboar
     g_time = stats.get('grow_time_min', {}).get('зерно', '??')
     h_time = stats.get('grow_time_min', {}).get('хмель', '??')
     
+    raw = await db.get_user_plots(user_id)
+    active = {}
+    for plot_num, crop_id, ready_str in raw:
+        if isinstance(ready_str, str):
+            active[plot_num] = (crop_id, datetime.fromisoformat(ready_str))
+
+    empty_plots_count = max_plots - len(active)
+    plot_status_lines = []
+    if empty_plots_count <= 0:
+        for i in range(1, max_plots + 1):
+            if i not in active:
+                continue
+
+            seed_id, ready = active[i]
+            product_id = SEED_TO_PRODUCT_ID.get(seed_id, '??')
+            crop_name = safe_name(CROP_SHORT, product_id, "??")
+            if now >= ready:
+                plot_status_lines.append(f"Грядка {i}: {crop_name} — <b>готово</b>")
+            else:
+                left = format_time_delta(ready - now)
+                plot_status_lines.append(f"Грядка {i}: {crop_name} — <b>{left}</b>")
+
+    if empty_plots_count > 0:
+        field_note = "Выбери свободную грядку, чтобы посадить семена."
+    else:
+        field_note = "Свободных грядок нет.\n\n" + "\n".join(plot_status_lines)
+
     text = (
         f"🌾 <b>Поле</b> · ур. <b>{lvl}</b>\n\n"
         f"Грядок: <b>{stats.get('plots', '??')}</b>\n"
         f"Шанс x2: <b>{stats.get('chance_x2', '??')}%</b>\n"
         f"Рост: 🌾 <b>{g_time}м</b> / 🌱 <b>{h_time}м</b>\n\n"
         f"{DIVIDER}\n"
-        "Выбери свободную грядку, чтобы посадить семена."
+        f"{field_note}"
     )
-
-    raw = await db.get_user_plots(user_id)
-    active = {}
-    for plot_num, crop_id, ready_str in raw:
-        if isinstance(ready_str, str):
-            active[plot_num] = (crop_id, datetime.fromisoformat(ready_str))
 
     per_row = 2 if max_plots <= 4 else 3
     plot_btns = []
@@ -352,7 +373,7 @@ async def get_plots_dashboard(user_id: int, db: Database) -> (str, InlineKeyboar
                 cb  = PlotCallback(action="harvest", owner_id=user_id, plot_num=i).pack()
             else:
                 left = format_time_delta(ready - now)
-                txt = f"⏳ {crop_name} ({left})"
+                txt = f"⏳ {crop_name}" if empty_plots_count <= 0 else f"⏳ {crop_name} ({left})"
                 cb  = PlotCallback(action="show_time", owner_id=user_id, plot_num=i).pack()
                 
         else:
