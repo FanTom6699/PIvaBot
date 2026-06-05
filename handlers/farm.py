@@ -364,22 +364,21 @@ async def get_plots_dashboard(user_id: int, db: Database) -> (str, InlineKeyboar
     for i in range(1, max_plots + 1):
         if i in active:
             seed_id, ready = active[i]
-            
+
             product_id = SEED_TO_PRODUCT_ID.get(seed_id, '??')
             crop_name = safe_name(CROP_SHORT, product_id, "??")
-            
+
             if now >= ready:
                 txt = f"✅ {crop_name} · собрать"
                 cb  = PlotCallback(action="harvest", owner_id=user_id, plot_num=i).pack()
+                plot_btns.append(InlineKeyboardButton(text=txt, callback_data=cb))
             else:
-                left = format_time_delta(ready - now)
-                txt = f"⏳ {crop_name}" if empty_plots_count <= 0 else f"⏳ {crop_name} ({left})"
-                cb  = PlotCallback(action="show_time", owner_id=user_id, plot_num=i).pack()
-                
+                continue
+
         else:
             txt = f"🟦 Грядка {i}"
             cb  = PlotCallback(action="plant_menu", owner_id=user_id, plot_num=i).pack()
-        plot_btns.append(InlineKeyboardButton(text=txt, callback_data=cb))
+            plot_btns.append(InlineKeyboardButton(text=txt, callback_data=cb))
 
     kb = rows(plot_btns, per_row=per_row)
     kb.append(back_btn_to_farm(user_id))
