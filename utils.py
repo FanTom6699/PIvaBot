@@ -49,3 +49,9 @@ def mention_user_from_parts(user_id: int, first_name: str | None, last_name: str
     if last_name:
         name += f" {last_name}"
     return mention_user(user_id, name)
+
+
+async def answer_to_trigger(message, text: str, **kwargs):
+    if message.chat.type == "private":
+        return await message.answer(text, **kwargs)
+    return await message.reply(text, **kwargs)

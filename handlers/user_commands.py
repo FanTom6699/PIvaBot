@@ -5,6 +5,7 @@ from aiogram.filters import Command
 
 from database import Database
 from settings import SettingsManager
+from utils import answer_to_trigger
 from .beer_service import run_beer_attempt
 from .common import (
     check_user_registered,
@@ -40,7 +41,7 @@ async def send_private_rating_prompt(message: Message, bot: Bot):
         "Общий рейтинг открывается в личке с ботом.\n"
         "Там можно выбрать 🍺 пиво, 🌾 зерно или 🌱 хмель."
     )
-    await message.answer(text, reply_markup=keyboard, parse_mode='HTML')
+    await answer_to_trigger(message, text, reply_markup=keyboard, parse_mode='HTML')
 
 # --- ✅✅✅ ИСПРАВЛЕННАЯ КОМАНДА /beer ✅✅✅ ---
 @user_commands_router.message(Command("beer"))
@@ -81,14 +82,15 @@ async def cmd_top(message: Message, bot: Bot, db: Database):
         user = message.from_user
         await db.add_user(user.id, user.first_name, user.last_name, user.username)
         chats = await get_available_user_chats(db, bot, user.id)
-        await message.answer(
+        await answer_to_trigger(
+            message,
             get_chat_top_picker_text(chats),
             reply_markup=get_chat_top_picker_keyboard(chats),
             parse_mode='HTML'
         )
     else:
         text = await get_chat_top_text(db, message.chat.id, message.from_user.id, message.chat.title)
-        await message.answer(text, parse_mode='HTML')
+        await answer_to_trigger(message, text, parse_mode='HTML')
 
 
 @user_commands_router.message(GroupTextAlias(*CHAT_TOP_ALIASES))
@@ -104,7 +106,8 @@ async def cmd_rating(message: Message, bot: Bot, db: Database):
 
     user = message.from_user
     await db.add_user(user.id, user.first_name, user.last_name, user.username)
-    await message.answer(
+    await answer_to_trigger(
+        message,
         get_rating_menu_text(),
         reply_markup=get_rating_keyboard(),
         parse_mode='HTML'
@@ -125,10 +128,10 @@ async def cmd_me(message: Message, bot: Bot, db: Database, settings: SettingsMan
     await db.add_user(user.id, user.first_name, user.last_name, user.username)
     if message.chat.type == 'private':
         text = await get_profile_text(user.id, user.full_name, db, settings)
-        await message.answer(text, reply_markup=get_profile_keyboard(user.id), parse_mode='HTML')
+        await answer_to_trigger(message, text, reply_markup=get_profile_keyboard(user.id), parse_mode='HTML')
     else:
         text = await get_compact_profile_text(user.id, user.full_name, db, settings)
-        await message.answer(text, parse_mode='HTML')
+        await answer_to_trigger(message, text, parse_mode='HTML')
 
 
 @user_commands_router.message(GroupTextAlias(*PROFILE_ALIASES))
@@ -143,7 +146,7 @@ async def cmd_profile(message: Message, bot: Bot, db: Database, settings: Settin
     await db.add_user(user.id, user.first_name, user.last_name, user.username)
     if message.chat.type == 'private':
         text = await get_profile_text(user.id, user.full_name, db, settings)
-        await message.answer(text, reply_markup=get_profile_keyboard(user.id), parse_mode='HTML')
+        await answer_to_trigger(message, text, reply_markup=get_profile_keyboard(user.id), parse_mode='HTML')
     else:
         text = await get_compact_profile_text(user.id, user.full_name, db, settings)
-        await message.answer(text, parse_mode='HTML')
+        await answer_to_trigger(message, text, parse_mode='HTML')

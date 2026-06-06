@@ -255,7 +255,7 @@ async def cmd_roulette(message: Message, bot: Bot, db: Database, settings: Setti
         )
     
     await db.change_rating(creator.id, -stake)
-    lobby_message = await message.answer("🎰 Крупье ставит кружки на стойку...")
+    lobby_message = await message.reply("🎰 Крупье ставит кружки на стойку...")
     game = GameState(creator, stake, max_players, lobby_message.message_id)
     active_games[chat_id] = game
     await lobby_message.edit_text(await generate_lobby_text(game), reply_markup=get_roulette_keyboard(game), parse_mode='HTML')
