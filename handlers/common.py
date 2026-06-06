@@ -26,7 +26,7 @@ def get_main_menu_keyboard(user_id: int) -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="👤 Профиль", callback_data=MainMenuCallback(action="profile").pack()),
         ],
         [
-            InlineKeyboardButton(text="🏆 Топ", callback_data=MainMenuCallback(action="top").pack()),
+            InlineKeyboardButton(text="🏆 Рейтинг", callback_data=MainMenuCallback(action="rating").pack()),
             InlineKeyboardButton(text="🌾 Ферма", callback_data=f"farm:main_dashboard:{user_id}"),
         ],
         [
@@ -40,6 +40,24 @@ def get_back_to_menu_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(text="⬅️ Назад в меню", callback_data=MainMenuCallback(action="home").pack())
     ]])
+
+
+def get_rating_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🍺 Пиво", callback_data=MainMenuCallback(action="rating_beer").pack())],
+        [
+            InlineKeyboardButton(text="🌾 Зерно", callback_data=MainMenuCallback(action="rating_grain").pack()),
+            InlineKeyboardButton(text="🌱 Хмель", callback_data=MainMenuCallback(action="rating_hops").pack()),
+        ],
+        [InlineKeyboardButton(text="⬅️ Назад в меню", callback_data=MainMenuCallback(action="home").pack())],
+    ])
+
+
+def get_back_to_rating_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="⬅️ Назад к рейтингу", callback_data=MainMenuCallback(action="rating").pack())],
+        [InlineKeyboardButton(text="⬅️ Назад в меню", callback_data=MainMenuCallback(action="home").pack())],
+    ])
 
 
 def get_profile_keyboard(user_id: int) -> InlineKeyboardMarkup:
@@ -204,15 +222,15 @@ async def get_top_text(db: Database, user_id: int | None = None) -> str:
     top_users = await db.get_top_users()
     if not top_users:
         return (
-            "🏆 <b>Топ бара</b>\n\n"
+            "🏆 <b>Рейтинг: 🍺 Пиво</b>\n\n"
             "В баре пока тихо.\n\n"
             f"{DIVIDER}\n"
             "Первый рейтинг появится после команды <code>/beer</code>."
         )
 
     text = (
-        "🏆 <b>Топ бара</b>\n\n"
-        "Самые заметные гости у стойки.\n\n"
+        "🏆 <b>Рейтинг: 🍺 Пиво</b>\n\n"
+        "Текущий рейтинг игроков по 🍺.\n\n"
         f"{DIVIDER}\n"
     )
     medals = ["🥇", "🥈", "🥉"]
@@ -228,6 +246,54 @@ async def get_top_text(db: Database, user_id: int | None = None) -> str:
         rank = await db.get_user_rank(user_id)
         if rank:
             text += f"\n{DIVIDER}\nТы: <b>#{rank['rank']}</b> — <b>{rank['rating']}</b> 🍺"
+    return text
+
+
+def get_rating_menu_text() -> str:
+    return (
+        "🏆 <b>Рейтинг</b>\n\n"
+        "Выбери таблицу.\n\n"
+        f"{DIVIDER}\n"
+        "🍺 <b>Пиво</b> — текущий рейтинг.\n"
+        "🌾 <b>Зерно</b> — всего собрано зерна.\n"
+        "🌱 <b>Хмель</b> — всего собрано хмеля."
+    )
+
+
+async def get_harvest_rating_text(db: Database, user_id: int | None, product_id: str) -> str:
+    config = {
+        "зерно": {"emoji": "🌾", "title": "Зерно"},
+        "хмель": {"emoji": "🌱", "title": "Хмель"},
+    }
+    item = config[product_id]
+    top_users = await db.get_top_harvest(product_id)
+
+    if not top_users:
+        return (
+            f"🏆 <b>Рейтинг: {item['emoji']} {item['title']}</b>\n\n"
+            "Пока никто не собрал этот ресурс.\n\n"
+            f"{DIVIDER}\n"
+            "Первый результат появится после сбора урожая на ферме."
+        )
+
+    text = (
+        f"🏆 <b>Рейтинг: {item['emoji']} {item['title']}</b>\n\n"
+        f"Всего собрано за всё время.\n\n"
+        f"{DIVIDER}\n"
+    )
+    medals = ["🥇", "🥈", "🥉"]
+    for i, (first_name, last_name, total) in enumerate(top_users):
+        name = first_name or "Игрок"
+        if last_name:
+            name += f" {last_name}"
+        name = escape(name)
+        place = medals[i] if i < len(medals) else f"{i + 1}."
+        text += f"{place} {name} — <b>{total}</b> {item['emoji']}\n"
+
+    if user_id:
+        rank = await db.get_user_harvest_rank(user_id, product_id)
+        if rank:
+            text += f"\n{DIVIDER}\nТы: <b>#{rank['rank']}</b> — <b>{rank['total']}</b> {item['emoji']}"
     return text
 
 
@@ -250,7 +316,7 @@ def get_help_text() -> str:
         "<b>Основное:</b>\n"
         "• <code>/start</code> - Зарегистрироваться или проверить свой профиль.\n"
         "• <code>/beer</code> - Испытать удачу (раз в 2 часа).\n"
-        "• <code>/top</code> - Показать таблицу лидеров.\n"
+        "• <code>/rating</code> - Открыть рейтинг игроков.\n"
         "• <code>/jackpot</code> - Проверить текущий джекпот.\n\n"
         f"{DIVIDER}\n"
         "<b>Мини-игры:</b>\n"
@@ -341,9 +407,18 @@ async def cq_main_menu(callback: CallbackQuery, callback_data: MainMenuCallback,
     elif callback_data.action == "profile":
         text = await get_profile_text(user.id, user.full_name, db, settings)
         keyboard = get_profile_keyboard(user.id)
-    elif callback_data.action == "top":
+    elif callback_data.action == "rating":
+        text = get_rating_menu_text()
+        keyboard = get_rating_keyboard()
+    elif callback_data.action == "rating_beer":
         text = await get_top_text(db, user.id)
-        keyboard = get_back_to_menu_keyboard()
+        keyboard = get_back_to_rating_keyboard()
+    elif callback_data.action == "rating_grain":
+        text = await get_harvest_rating_text(db, user.id, "зерно")
+        keyboard = get_back_to_rating_keyboard()
+    elif callback_data.action == "rating_hops":
+        text = await get_harvest_rating_text(db, user.id, "хмель")
+        keyboard = get_back_to_rating_keyboard()
     elif callback_data.action == "jackpot":
         current_jackpot = await db.get_jackpot()
         text = get_jackpot_text(current_jackpot)

@@ -11,7 +11,8 @@ from .common import (
     get_compact_profile_text,
     get_profile_keyboard,
     get_profile_text,
-    get_top_text,
+    get_rating_keyboard,
+    get_rating_menu_text,
 )
 
 # --- ИНИЦИАЛИЗАЦИЯ --
@@ -42,13 +43,13 @@ async def cmd_beer(message: Message, bot: Bot, db: Database, settings: SettingsM
 
 
 @user_commands_router.message(Command("top"))
-async def cmd_top(message: Message, bot: Bot, db: Database):
+@user_commands_router.message(Command("rating"))
+async def cmd_rating(message: Message, bot: Bot, db: Database):
     # (Проверка регистрации в группе)
     if message.chat.type != 'private' and not await check_user_registered(message, bot, db):
         return
 
-    top_text = await get_top_text(db, message.from_user.id)
-    await message.answer(top_text, parse_mode='HTML')
+    await message.answer(get_rating_menu_text(), reply_markup=get_rating_keyboard(), parse_mode='HTML')
 
 
 @user_commands_router.message(Command("me"))

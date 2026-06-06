@@ -65,6 +65,13 @@ class Database:
                     items_json TEXT DEFAULT '{}'
                 )
             ''')
+            await db.execute('''
+                CREATE TABLE IF NOT EXISTS user_harvest_stats (
+                    user_id INTEGER PRIMARY KEY,
+                    total_grain INTEGER DEFAULT 0,
+                    total_hops INTEGER DEFAULT 0
+                )
+            ''')
             # Уведомления
             await db.execute('''
                 CREATE TABLE IF NOT EXISTS farm_notifications (
@@ -172,9 +179,10 @@ class Database:
             await db.execute("INSERT OR IGNORE INTO user_farm_data (user_id) VALUES (?)", (user_id,))
             # Инициализация инвентаря
             await db.execute(
-                "INSERT OR IGNORE INTO user_inventory (user_id, items_json) VALUES (?, ?)", 
+                "INSERT OR IGNORE INTO user_inventory (user_id, items_json) VALUES (?, ?)",
                 (user_id, json.dumps(DEFAULT_INVENTORY))
             )
+            await db.execute("INSERT OR IGNORE INTO user_harvest_stats (user_id) VALUES (?)", (user_id,))
             await db.commit()
 
     async def add_chat(self, chat_id: int, title: str | None):
@@ -287,6 +295,74 @@ class Database:
             return {
                 "rank": rank_row[0] if rank_row else 1,
                 "rating": rating,
+            }
+
+    async def add_harvest_stat(self, user_id: int, product_id: str, amount: int):
+        column_by_product = {
+            "зерно": "total_grain",
+            "хмель": "total_hops",
+        }
+        column = column_by_product.get(product_id)
+        if not column:
+            return
+
+        async with aiosqlite.connect(self.db_name) as db:
+            await db.execute("INSERT OR IGNORE INTO user_harvest_stats (user_id) VALUES (?)", (user_id,))
+            await db.execute(
+                f"UPDATE user_harvest_stats SET {column} = {column} + ? WHERE user_id = ?",
+                (amount, user_id)
+            )
+            await db.commit()
+
+    async def get_top_harvest(self, product_id: str, limit: int = 10):
+        column_by_product = {
+            "зерно": "total_grain",
+            "хмель": "total_hops",
+        }
+        column = column_by_product.get(product_id)
+        if not column:
+            return []
+
+        async with aiosqlite.connect(self.db_name) as db:
+            cursor = await db.execute(
+                f"""
+                SELECT U.first_name, U.last_name, COALESCE(S.{column}, 0) AS total
+                FROM users U
+                LEFT JOIN user_harvest_stats S ON U.user_id = S.user_id
+                WHERE COALESCE(S.{column}, 0) > 0
+                ORDER BY total DESC
+                LIMIT ?
+                """,
+                (limit,)
+            )
+            return await cursor.fetchall()
+
+    async def get_user_harvest_rank(self, user_id: int, product_id: str):
+        column_by_product = {
+            "зерно": "total_grain",
+            "хмель": "total_hops",
+        }
+        column = column_by_product.get(product_id)
+        if not column:
+            return None
+
+        async with aiosqlite.connect(self.db_name) as db:
+            await db.execute("INSERT OR IGNORE INTO user_harvest_stats (user_id) VALUES (?)", (user_id,))
+            cursor = await db.execute(
+                f"SELECT COALESCE({column}, 0) FROM user_harvest_stats WHERE user_id = ?",
+                (user_id,)
+            )
+            row = await cursor.fetchone()
+            total = row[0] if row else 0
+            cursor = await db.execute(
+                f"SELECT COUNT(*) + 1 FROM user_harvest_stats WHERE COALESCE({column}, 0) > ?",
+                (total,)
+            )
+            rank_row = await cursor.fetchone()
+            await db.commit()
+            return {
+                "rank": rank_row[0] if rank_row else 1,
+                "total": total,
             }
 
     # --- НАСТРОЙКИ ---

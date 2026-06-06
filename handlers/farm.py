@@ -592,6 +592,7 @@ async def cq_plot_harvest(callback: CallbackQuery, callback_data: PlotCallback, 
     if seed:
         prod = SEED_TO_PRODUCT_ID[seed]
         await db.modify_inventory(callback.from_user.id, prod, 1)
+        await db.add_harvest_stat(callback.from_user.id, prod, 1)
         await callback.answer(f"Собрано: 1 {FARM_ITEM_NAMES[prod]}")
         await cq_farm_view_plots(callback, FarmCallback(action="view_plots", owner_id=callback.from_user.id), db)
     else:
