@@ -84,7 +84,7 @@ def get_roulette_cancel_text(reason: str) -> str:
     )
 
 
-def get_roulette_winner_text(winner_name: str, prize: int) -> str:
+def get_roulette_winner_text(winner_name: str, prize: int, participants_text: str) -> str:
     templates = [
         (
             "🏆 <b>Бар признал победителя</b>\n\n"
@@ -149,6 +149,8 @@ def get_roulette_winner_text(winner_name: str, prize: int) -> str:
     ]
     return (
         random.choice(templates).format(name=winner_name, prize=prize)
+        + f"\n\n{DIVIDER}\n"
+        + f"<b>Участники:</b>\n{participants_text}"
         + "\n\n<i>Пивная рулетка закрыта до следующего раунда.</i>"
     )
 
@@ -369,7 +371,11 @@ async def start_roulette_game(chat_id: int, bot: Bot, db: Database):
     winner = players_in_game[0]
     prize = game.stake * len(game.players)
     await db.change_rating(winner.id, prize)
-    winner_text = get_roulette_winner_text(escape(winner.full_name), prize)
+    participants_text = "\n".join(
+        f"• {'🏆 ' if player.id == winner.id else ''}{escape(player.full_name)}"
+        for player in game.players.values()
+    )
+    winner_text = get_roulette_winner_text(escape(winner.full_name), prize, participants_text)
     await bot.send_message(chat_id, text=winner_text, parse_mode='HTML')
     del active_games[chat_id]
     chat_cooldowns[chat_id] = datetime.now()
