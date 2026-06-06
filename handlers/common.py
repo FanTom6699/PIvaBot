@@ -19,6 +19,10 @@ class MainMenuCallback(CallbackData, prefix="menu"):
     action: str
 
 
+class ChatTopCallback(CallbackData, prefix="chat_top"):
+    chat_id: int
+
+
 def get_main_menu_keyboard(user_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [
@@ -56,6 +60,29 @@ def get_rating_keyboard() -> InlineKeyboardMarkup:
 def get_back_to_rating_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="⬅️ Назад к топам", callback_data=MainMenuCallback(action="rating").pack())],
+        [InlineKeyboardButton(text="⬅️ Назад в меню", callback_data=MainMenuCallback(action="home").pack())],
+    ])
+
+
+def crop_button_text(text: str, limit: int = 32) -> str:
+    return text if len(text) <= limit else f"{text[:limit - 1]}…"
+
+
+def get_chat_top_picker_keyboard(chats) -> InlineKeyboardMarkup:
+    rows = []
+    for chat_id, title in chats:
+        chat_title = crop_button_text(title or f"Чат {chat_id}")
+        rows.append([InlineKeyboardButton(
+            text=f"💬 {chat_title}",
+            callback_data=ChatTopCallback(chat_id=chat_id).pack()
+        )])
+    rows.append([InlineKeyboardButton(text="⬅️ Назад в меню", callback_data=MainMenuCallback(action="home").pack())])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def get_chat_top_back_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="⬅️ Назад к чатам", callback_data=MainMenuCallback(action="rating").pack())],
         [InlineKeyboardButton(text="⬅️ Назад в меню", callback_data=MainMenuCallback(action="home").pack())],
     ])
 
@@ -249,19 +276,22 @@ async def get_top_text(db: Database, user_id: int | None = None) -> str:
     return text
 
 
-async def get_chat_top_text(db: Database, chat_id: int, user_id: int | None = None) -> str:
+async def get_chat_top_text(db: Database, chat_id: int, user_id: int | None = None, chat_title: str | None = None) -> str:
+    title_text = escape(chat_title) if chat_title else "этот чат"
     top_users = await db.get_chat_top_users(chat_id)
     if not top_users:
         return (
             "🏆 <b>Топ пива в чате</b>\n\n"
-            "В этом чате пока нет игроков в топе.\n\n"
+            f"Чат: <b>{title_text}</b>\n\n"
+            "Пока нет игроков в топе.\n\n"
             f"{DIVIDER}\n"
             "Первый результат появится после команды <code>/beer</code>."
         )
 
     text = (
         "🏆 <b>Топ пива в чате</b>\n\n"
-        "Текущий топ игроков этого чата по 🍺.\n\n"
+        f"Чат: <b>{title_text}</b>\n"
+        "Текущий топ игроков по 🍺.\n\n"
         f"{DIVIDER}\n"
     )
     medals = ["🥇", "🥈", "🥉"]
@@ -278,6 +308,36 @@ async def get_chat_top_text(db: Database, chat_id: int, user_id: int | None = No
         if rank:
             text += f"\n{DIVIDER}\nТы в этом чате: <b>#{rank['rank']}</b> — <b>{rank['rating']}</b> 🍺"
     return text
+
+
+def get_chat_top_picker_text(chats) -> str:
+    if not chats:
+        return (
+            "🏆 <b>Топы чатов</b>\n\n"
+            "Пока нет общих чатов для выбора.\n\n"
+            f"{DIVIDER}\n"
+            "Напиши <code>/beer</code> или <code>/me</code> в группе, где есть бот, и этот чат появится здесь."
+        )
+
+    return (
+        "🏆 <b>Топы чатов</b>\n\n"
+        "Выбери чат, чей топ пива показать.\n\n"
+        f"{DIVIDER}\n"
+        "Показываются только группы, где есть бот и где ты уже использовал команды."
+    )
+
+
+async def get_available_user_chats(db: Database, bot: Bot, user_id: int):
+    chats = await db.get_user_chats(user_id)
+    available_chats = []
+    for chat_id, title in chats:
+        try:
+            member = await bot.get_chat_member(chat_id, user_id)
+        except Exception:
+            continue
+        if member.status not in ("left", "kicked"):
+            available_chats.append((chat_id, title))
+    return available_chats
 
 
 def get_rating_menu_text() -> str:
@@ -431,7 +491,7 @@ async def cmd_help(message: Message):
 
 
 @common_router.callback_query(MainMenuCallback.filter())
-async def cq_main_menu(callback: CallbackQuery, callback_data: MainMenuCallback, db: Database, settings: SettingsManager):
+async def cq_main_menu(callback: CallbackQuery, callback_data: MainMenuCallback, bot: Bot, db: Database, settings: SettingsManager):
     user = callback.from_user
     await db.add_user(user.id, user.first_name, user.last_name, user.username)
 
@@ -442,8 +502,9 @@ async def cq_main_menu(callback: CallbackQuery, callback_data: MainMenuCallback,
         text = await get_profile_text(user.id, user.full_name, db, settings)
         keyboard = get_profile_keyboard(user.id)
     elif callback_data.action == "rating":
-        text = get_rating_menu_text()
-        keyboard = get_rating_keyboard()
+        chats = await get_available_user_chats(db, bot, user.id)
+        text = get_chat_top_picker_text(chats)
+        keyboard = get_chat_top_picker_keyboard(chats)
     elif callback_data.action == "rating_beer":
         text = await get_top_text(db, user.id)
         keyboard = get_back_to_rating_keyboard()
@@ -476,6 +537,32 @@ async def cq_main_menu(callback: CallbackQuery, callback_data: MainMenuCallback,
     await callback.message.edit_text(
         text,
         reply_markup=keyboard,
+        parse_mode='HTML'
+    )
+    await callback.answer()
+
+
+@common_router.callback_query(ChatTopCallback.filter())
+async def cq_chat_top(callback: CallbackQuery, callback_data: ChatTopCallback, bot: Bot, db: Database):
+    chat = await db.get_user_chat(callback.from_user.id, callback_data.chat_id)
+    if not chat:
+        await callback.answer("Этот чат пока недоступен для тебя.", show_alert=True)
+        return
+
+    try:
+        member = await bot.get_chat_member(chat[0], callback.from_user.id)
+    except Exception:
+        await callback.answer("Не могу проверить этот чат.", show_alert=True)
+        return
+
+    if member.status in ("left", "kicked"):
+        await callback.answer("Ты уже не в этом чате.", show_alert=True)
+        return
+
+    text = await get_chat_top_text(db, chat[0], callback.from_user.id, chat[1])
+    await callback.message.edit_text(
+        text,
+        reply_markup=get_chat_top_back_keyboard(),
         parse_mode='HTML'
     )
     await callback.answer()

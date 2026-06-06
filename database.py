@@ -218,6 +218,34 @@ class Database:
             )
             await db.commit()
 
+    async def get_user_chats(self, user_id: int, limit: int = 20):
+        async with aiosqlite.connect(self.db_name) as db:
+            cursor = await db.execute(
+                """
+                SELECT C.chat_id, C.title
+                FROM chat_members M
+                JOIN chats C ON C.chat_id = M.chat_id
+                WHERE M.user_id = ?
+                ORDER BY C.title COLLATE NOCASE
+                LIMIT ?
+                """,
+                (user_id, limit)
+            )
+            return await cursor.fetchall()
+
+    async def get_user_chat(self, user_id: int, chat_id: int):
+        async with aiosqlite.connect(self.db_name) as db:
+            cursor = await db.execute(
+                """
+                SELECT C.chat_id, C.title
+                FROM chat_members M
+                JOIN chats C ON C.chat_id = M.chat_id
+                WHERE M.user_id = ? AND M.chat_id = ?
+                """,
+                (user_id, chat_id)
+            )
+            return await cursor.fetchone()
+
     async def get_all_users_ids(self) -> List[int]:
         async with aiosqlite.connect(self.db_name) as db:
             cursor = await db.execute("SELECT user_id FROM users")
