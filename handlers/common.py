@@ -30,7 +30,7 @@ def get_main_menu_keyboard(user_id: int) -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="👤 Профиль", callback_data=MainMenuCallback(action="profile").pack()),
         ],
         [
-            InlineKeyboardButton(text="🏆 Топ", callback_data=MainMenuCallback(action="rating").pack()),
+            InlineKeyboardButton(text="🏆 Рейтинг", callback_data=MainMenuCallback(action="rating").pack()),
             InlineKeyboardButton(text="🌾 Ферма", callback_data=f"farm:main_dashboard:{user_id}"),
         ],
         [
@@ -59,7 +59,7 @@ def get_rating_keyboard() -> InlineKeyboardMarkup:
 
 def get_back_to_rating_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="⬅️ Назад к топам", callback_data=MainMenuCallback(action="rating").pack())],
+        [InlineKeyboardButton(text="⬅️ Назад к рейтингу", callback_data=MainMenuCallback(action="rating").pack())],
         [InlineKeyboardButton(text="⬅️ Назад в меню", callback_data=MainMenuCallback(action="home").pack())],
     ])
 
@@ -249,15 +249,15 @@ async def get_top_text(db: Database, user_id: int | None = None) -> str:
     top_users = await db.get_top_users()
     if not top_users:
         return (
-            "🏆 <b>Топ: 🍺 Пиво</b>\n\n"
+            "🏆 <b>Рейтинг: 🍺 Пиво</b>\n\n"
             "В баре пока тихо.\n\n"
             f"{DIVIDER}\n"
-            "Первый топ появится после команды <code>/beer</code>."
+            "Первый рейтинг появится после команды <code>/beer</code>."
         )
 
     text = (
-        "🏆 <b>Топ: 🍺 Пиво</b>\n\n"
-        "Текущий топ игроков по 🍺.\n\n"
+        "🏆 <b>Рейтинг: 🍺 Пиво</b>\n\n"
+        "Глобальный рейтинг игроков по 🍺.\n\n"
         f"{DIVIDER}\n"
     )
     medals = ["🥇", "🥈", "🥉"]
@@ -342,10 +342,10 @@ async def get_available_user_chats(db: Database, bot: Bot, user_id: int):
 
 def get_rating_menu_text() -> str:
     return (
-        "🏆 <b>Топы</b>\n\n"
+        "🏆 <b>Рейтинг</b>\n\n"
         "Выбери таблицу.\n\n"
         f"{DIVIDER}\n"
-        "🍺 <b>Пиво</b> — текущий топ.\n"
+        "🍺 <b>Пиво</b> — глобальный рейтинг.\n"
         "🌾 <b>Зерно</b> — всего собрано зерна.\n"
         "🌱 <b>Хмель</b> — всего собрано хмеля."
     )
@@ -361,14 +361,14 @@ async def get_harvest_rating_text(db: Database, user_id: int | None, product_id:
 
     if not top_users:
         return (
-            f"🏆 <b>Топ: {item['emoji']} {item['title']}</b>\n\n"
+            f"🏆 <b>Рейтинг: {item['emoji']} {item['title']}</b>\n\n"
             "Пока никто не собрал этот ресурс.\n\n"
             f"{DIVIDER}\n"
             "Первый результат появится после сбора урожая на ферме."
         )
 
     text = (
-        f"🏆 <b>Топ: {item['emoji']} {item['title']}</b>\n\n"
+        f"🏆 <b>Рейтинг: {item['emoji']} {item['title']}</b>\n\n"
         f"Всего собрано за всё время.\n\n"
         f"{DIVIDER}\n"
     )
@@ -502,9 +502,8 @@ async def cq_main_menu(callback: CallbackQuery, callback_data: MainMenuCallback,
         text = await get_profile_text(user.id, user.full_name, db, settings)
         keyboard = get_profile_keyboard(user.id)
     elif callback_data.action == "rating":
-        chats = await get_available_user_chats(db, bot, user.id)
-        text = get_chat_top_picker_text(chats)
-        keyboard = get_chat_top_picker_keyboard(chats)
+        text = get_rating_menu_text()
+        keyboard = get_rating_keyboard()
     elif callback_data.action == "rating_beer":
         text = await get_top_text(db, user.id)
         keyboard = get_back_to_rating_keyboard()

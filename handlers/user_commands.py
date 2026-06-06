@@ -8,13 +8,12 @@ from settings import SettingsManager
 from .beer_service import run_beer_attempt
 from .common import (
     check_user_registered,
-    get_chat_top_picker_keyboard,
-    get_chat_top_picker_text,
     get_chat_top_text,
-    get_available_user_chats,
     get_compact_profile_text,
     get_profile_keyboard,
     get_profile_text,
+    get_rating_keyboard,
+    get_rating_menu_text,
 )
 
 # --- ИНИЦИАЛИЗАЦИЯ --
@@ -54,10 +53,9 @@ async def cmd_rating(message: Message, bot: Bot, db: Database):
     if message.chat.type == 'private':
         user = message.from_user
         await db.add_user(user.id, user.first_name, user.last_name, user.username)
-        chats = await get_available_user_chats(db, bot, user.id)
         await message.answer(
-            get_chat_top_picker_text(chats),
-            reply_markup=get_chat_top_picker_keyboard(chats),
+            get_rating_menu_text(),
+            reply_markup=get_rating_keyboard(),
             parse_mode='HTML'
         )
     else:
