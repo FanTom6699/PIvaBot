@@ -36,6 +36,14 @@ class Database:
                 (datetime.now().isoformat(),)
             )
             await db.execute('CREATE TABLE IF NOT EXISTS chats (chat_id INTEGER PRIMARY KEY, title TEXT)')
+            await db.execute('''
+                CREATE TABLE IF NOT EXISTS chat_members (
+                    chat_id INTEGER,
+                    user_id INTEGER,
+                    first_seen_at TEXT,
+                    PRIMARY KEY (chat_id, user_id)
+                )
+            ''')
             await db.execute('CREATE TABLE IF NOT EXISTS game_data (key TEXT PRIMARY KEY, value INTEGER)')
             # --- ТАБЛИЦЫ ФЕРМЫ ---
             await db.execute('''
@@ -198,6 +206,18 @@ class Database:
             await db.execute("DELETE FROM chats WHERE chat_id = ?", (chat_id,))
             await db.commit()
 
+    async def add_user_to_chat(self, chat_id: int, user_id: int, title: str | None = None):
+        async with aiosqlite.connect(self.db_name) as db:
+            await db.execute(
+                "INSERT OR REPLACE INTO chats (chat_id, title) VALUES (?, ?)",
+                (chat_id, title)
+            )
+            await db.execute(
+                "INSERT OR IGNORE INTO chat_members (chat_id, user_id, first_seen_at) VALUES (?, ?, ?)",
+                (chat_id, user_id, datetime.now().isoformat())
+            )
+            await db.commit()
+
     async def get_all_users_ids(self) -> List[int]:
         async with aiosqlite.connect(self.db_name) as db:
             cursor = await db.execute("SELECT user_id FROM users")
@@ -290,6 +310,52 @@ class Database:
             cursor = await db.execute(
                 "SELECT COUNT(*) + 1 FROM users WHERE beer_rating > ?",
                 (rating,)
+            )
+            rank_row = await cursor.fetchone()
+            return {
+                "rank": rank_row[0] if rank_row else 1,
+                "rating": rating,
+            }
+
+    async def get_chat_top_users(self, chat_id: int, limit: int = 10):
+        async with aiosqlite.connect(self.db_name) as db:
+            cursor = await db.execute(
+                """
+                SELECT U.first_name, U.last_name, U.beer_rating
+                FROM chat_members M
+                JOIN users U ON U.user_id = M.user_id
+                WHERE M.chat_id = ?
+                ORDER BY U.beer_rating DESC
+                LIMIT ?
+                """,
+                (chat_id, limit)
+            )
+            return await cursor.fetchall()
+
+    async def get_user_chat_rank(self, user_id: int, chat_id: int):
+        async with aiosqlite.connect(self.db_name) as db:
+            cursor = await db.execute(
+                """
+                SELECT U.beer_rating
+                FROM users U
+                JOIN chat_members M ON M.user_id = U.user_id
+                WHERE U.user_id = ? AND M.chat_id = ?
+                """,
+                (user_id, chat_id)
+            )
+            row = await cursor.fetchone()
+            if not row:
+                return None
+
+            rating = row[0]
+            cursor = await db.execute(
+                """
+                SELECT COUNT(*) + 1
+                FROM chat_members M
+                JOIN users U ON U.user_id = M.user_id
+                WHERE M.chat_id = ? AND U.beer_rating > ?
+                """,
+                (chat_id, rating)
             )
             rank_row = await cursor.fetchone()
             return {

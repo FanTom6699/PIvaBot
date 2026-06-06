@@ -26,7 +26,7 @@ def get_main_menu_keyboard(user_id: int) -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="👤 Профиль", callback_data=MainMenuCallback(action="profile").pack()),
         ],
         [
-            InlineKeyboardButton(text="🏆 Рейтинг", callback_data=MainMenuCallback(action="rating").pack()),
+            InlineKeyboardButton(text="🏆 Топ", callback_data=MainMenuCallback(action="rating").pack()),
             InlineKeyboardButton(text="🌾 Ферма", callback_data=f"farm:main_dashboard:{user_id}"),
         ],
         [
@@ -55,7 +55,7 @@ def get_rating_keyboard() -> InlineKeyboardMarkup:
 
 def get_back_to_rating_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="⬅️ Назад к рейтингу", callback_data=MainMenuCallback(action="rating").pack())],
+        [InlineKeyboardButton(text="⬅️ Назад к топам", callback_data=MainMenuCallback(action="rating").pack())],
         [InlineKeyboardButton(text="⬅️ Назад в меню", callback_data=MainMenuCallback(action="home").pack())],
     ])
 
@@ -222,15 +222,15 @@ async def get_top_text(db: Database, user_id: int | None = None) -> str:
     top_users = await db.get_top_users()
     if not top_users:
         return (
-            "🏆 <b>Рейтинг: 🍺 Пиво</b>\n\n"
+            "🏆 <b>Топ: 🍺 Пиво</b>\n\n"
             "В баре пока тихо.\n\n"
             f"{DIVIDER}\n"
-            "Первый рейтинг появится после команды <code>/beer</code>."
+            "Первый топ появится после команды <code>/beer</code>."
         )
 
     text = (
-        "🏆 <b>Рейтинг: 🍺 Пиво</b>\n\n"
-        "Текущий рейтинг игроков по 🍺.\n\n"
+        "🏆 <b>Топ: 🍺 Пиво</b>\n\n"
+        "Текущий топ игроков по 🍺.\n\n"
         f"{DIVIDER}\n"
     )
     medals = ["🥇", "🥈", "🥉"]
@@ -249,12 +249,43 @@ async def get_top_text(db: Database, user_id: int | None = None) -> str:
     return text
 
 
+async def get_chat_top_text(db: Database, chat_id: int, user_id: int | None = None) -> str:
+    top_users = await db.get_chat_top_users(chat_id)
+    if not top_users:
+        return (
+            "🏆 <b>Топ пива в чате</b>\n\n"
+            "В этом чате пока нет игроков в топе.\n\n"
+            f"{DIVIDER}\n"
+            "Первый результат появится после команды <code>/beer</code>."
+        )
+
+    text = (
+        "🏆 <b>Топ пива в чате</b>\n\n"
+        "Текущий топ игроков этого чата по 🍺.\n\n"
+        f"{DIVIDER}\n"
+    )
+    medals = ["🥇", "🥈", "🥉"]
+    for i, (first_name, last_name, rating) in enumerate(top_users):
+        name = first_name or "Игрок"
+        if last_name:
+            name += f" {last_name}"
+        name = escape(name)
+        place = medals[i] if i < len(medals) else f"{i + 1}."
+        text += f"{place} {name} — <b>{rating}</b> 🍺\n"
+
+    if user_id:
+        rank = await db.get_user_chat_rank(user_id, chat_id)
+        if rank:
+            text += f"\n{DIVIDER}\nТы в этом чате: <b>#{rank['rank']}</b> — <b>{rank['rating']}</b> 🍺"
+    return text
+
+
 def get_rating_menu_text() -> str:
     return (
-        "🏆 <b>Рейтинг</b>\n\n"
+        "🏆 <b>Топы</b>\n\n"
         "Выбери таблицу.\n\n"
         f"{DIVIDER}\n"
-        "🍺 <b>Пиво</b> — текущий рейтинг.\n"
+        "🍺 <b>Пиво</b> — текущий топ.\n"
         "🌾 <b>Зерно</b> — всего собрано зерна.\n"
         "🌱 <b>Хмель</b> — всего собрано хмеля."
     )
@@ -270,14 +301,14 @@ async def get_harvest_rating_text(db: Database, user_id: int | None, product_id:
 
     if not top_users:
         return (
-            f"🏆 <b>Рейтинг: {item['emoji']} {item['title']}</b>\n\n"
+            f"🏆 <b>Топ: {item['emoji']} {item['title']}</b>\n\n"
             "Пока никто не собрал этот ресурс.\n\n"
             f"{DIVIDER}\n"
             "Первый результат появится после сбора урожая на ферме."
         )
 
     text = (
-        f"🏆 <b>Рейтинг: {item['emoji']} {item['title']}</b>\n\n"
+        f"🏆 <b>Топ: {item['emoji']} {item['title']}</b>\n\n"
         f"Всего собрано за всё время.\n\n"
         f"{DIVIDER}\n"
     )
@@ -316,7 +347,7 @@ def get_help_text() -> str:
         "<b>Основное:</b>\n"
         "• <code>/start</code> - Зарегистрироваться или проверить свой профиль.\n"
         "• <code>/beer</code> - Испытать удачу (раз в 2 часа).\n"
-        "• <code>/rating</code> - Открыть рейтинг игроков.\n"
+        "• <code>/top</code> - Открыть топ игроков.\n"
         "• <code>/jackpot</code> - Проверить текущий джекпот.\n\n"
         f"{DIVIDER}\n"
         "<b>Мини-игры:</b>\n"
@@ -332,6 +363,9 @@ def get_help_text() -> str:
 async def check_user_registered(message_or_callback: Message | CallbackQuery, bot: Bot, db: Database) -> bool:
     user = message_or_callback.from_user
     if await db.user_exists(user.id):
+        chat = message_or_callback.chat if isinstance(message_or_callback, Message) else message_or_callback.message.chat
+        if chat.type != "private":
+            await db.add_user_to_chat(chat.id, user.id, chat.title)
         return True
     
     me = await bot.get_me()

@@ -8,6 +8,7 @@ from settings import SettingsManager
 from .beer_service import run_beer_attempt
 from .common import (
     check_user_registered,
+    get_chat_top_text,
     get_compact_profile_text,
     get_profile_keyboard,
     get_profile_text,
@@ -49,7 +50,11 @@ async def cmd_rating(message: Message, bot: Bot, db: Database):
     if message.chat.type != 'private' and not await check_user_registered(message, bot, db):
         return
 
-    await message.answer(get_rating_menu_text(), reply_markup=get_rating_keyboard(), parse_mode='HTML')
+    if message.chat.type == 'private':
+        await message.answer(get_rating_menu_text(), reply_markup=get_rating_keyboard(), parse_mode='HTML')
+    else:
+        text = await get_chat_top_text(db, message.chat.id, message.from_user.id)
+        await message.answer(text, parse_mode='HTML')
 
 
 @user_commands_router.message(Command("me"))
