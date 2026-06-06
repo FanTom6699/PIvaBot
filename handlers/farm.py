@@ -14,7 +14,7 @@ from aiogram.filters.callback_data import CallbackData
 from aiogram.exceptions import TelegramBadRequest
 
 from database import Database
-from .common import check_user_registered
+from .common import check_user_registered, get_main_menu_keyboard, get_private_start_text
 from utils import format_time_delta
 
 from .farm_config import (
@@ -306,7 +306,7 @@ async def get_farm_dashboard(user_id: int, user_name: str, db: Database) -> (str
         InlineKeyboardButton(text="❓ Как играть?", callback_data=FarmCallback(action="show_help", owner_id=user_id).pack())
     ]
     kb += rows(kb_buttons, per_row=2)
-    kb.append([InlineKeyboardButton(text="⬅️ Главное меню", callback_data="menu:home")])
+    kb.append([InlineKeyboardButton(text="⬅️ Главное меню", callback_data=FarmCallback(action="main_menu", owner_id=user_id).pack())])
 
     return text, InlineKeyboardMarkup(inline_keyboard=kb)
 
@@ -415,6 +415,17 @@ async def cq_farm_main_dashboard(callback: CallbackQuery, callback_data: FarmCal
     except Exception as e:
         logging.error(f"Dash error: {e}")
     await callback.answer()
+
+
+@farm_router.callback_query(FarmCallback.filter(F.action == "main_menu"))
+async def cq_farm_main_menu(callback: CallbackQuery, callback_data: FarmCallback):
+    if not await check_owner(callback, callback_data.owner_id): return
+    text = get_private_start_text(callback.from_user.full_name, False)
+    keyboard = get_main_menu_keyboard(callback.from_user.id)
+    with suppress(TelegramBadRequest):
+        await callback.message.edit_text(text, reply_markup=keyboard, parse_mode='HTML')
+    await callback.answer()
+
 
 @farm_router.callback_query(FarmCallback.filter(F.action == "view_plots"))
 async def cq_farm_view_plots(callback: CallbackQuery, callback_data: FarmCallback, db: Database):
@@ -599,7 +610,8 @@ async def cq_plot_harvest(callback: CallbackQuery, callback_data: PlotCallback, 
         await callback.answer("Ошибка сбора", show_alert=True)
 
 @farm_router.callback_query(PlotCallback.filter(F.action == "show_time"))
-async def cq_plot_time(callback: CallbackQuery):
+async def cq_plot_time(callback: CallbackQuery, callback_data: PlotCallback):
+    if not await check_owner(callback, callback_data.owner_id): return
     await callback.answer("Еще растет...", show_alert=True)
 
 # --- ПИВОВАРНЯ ---
@@ -717,6 +729,7 @@ async def cq_brewery_collect(callback: CallbackQuery, callback_data: BreweryCall
 
 @farm_router.callback_query(FarmCallback.filter(F.action == "show_brew_time"))
 async def cq_show_brew_time(callback: CallbackQuery, callback_data: FarmCallback, db: Database):
+    if not await check_owner(callback, callback_data.owner_id): return
     farm = await db.get_user_farm_data(callback_data.owner_id)
     if farm.get('brewery_batch_timer_end'):
          left = format_time_delta(farm['brewery_batch_timer_end'] - datetime.now())
@@ -725,7 +738,8 @@ async def cq_show_brew_time(callback: CallbackQuery, callback_data: FarmCallback
          await callback.answer("Не варится.")
 
 @farm_router.callback_query(FarmCallback.filter(F.action == "show_upgrade_time"))
-async def cq_show_upgrade_time(callback: CallbackQuery):
+async def cq_show_upgrade_time(callback: CallbackQuery, callback_data: FarmCallback):
+    if not await check_owner(callback, callback_data.owner_id): return
     await callback.answer("⏳ Идет стройка...", show_alert=True)
 
 
@@ -849,6 +863,7 @@ async def cq_upgrade_confirm(callback: CallbackQuery, callback_data: UpgradeCall
 
 @farm_router.callback_query(FarmCallback.filter(F.action == "show_help"))
 async def cq_farm_help(callback: CallbackQuery, callback_data: FarmCallback):
+    if not await check_owner(callback, callback_data.owner_id): return
     text = get_farm_help_text()
     kb = [back_btn_to_farm(callback.from_user.id)]
     with suppress(TelegramBadRequest):
