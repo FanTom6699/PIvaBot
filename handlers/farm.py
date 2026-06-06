@@ -5,7 +5,6 @@ import random
 from datetime import datetime, timedelta
 from contextlib import suppress
 from typing import Dict, Any, Optional
-from html import escape 
 
 from aiogram import Router, F, Bot
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
@@ -15,7 +14,7 @@ from aiogram.exceptions import TelegramBadRequest
 
 from database import Database
 from .common import check_user_registered, get_main_menu_keyboard, get_private_start_text
-from utils import format_time_delta
+from utils import format_time_delta, mention_user
 
 from .farm_config import (
     FARM_ITEM_NAMES, 
@@ -45,8 +44,8 @@ def rows(btns, per_row: int) -> list[list]:
 def safe_name(map_: dict, key: str, fallback: str = "??") -> str:
     return map_.get(key, fallback)
 
-def dash_title(user_name: str) -> str:
-    return f"<b>🌾 Ферма: {escape(user_name)}</b>"
+def dash_title(user_id: int, user_name: str) -> str:
+    return f"<b>🌾 Ферма: {mention_user(user_id, user_name)}</b>"
 
 def back_btn_to_farm(user_id: int) -> list:
     # Используем исправленный FarmCallback
@@ -233,7 +232,7 @@ async def get_farm_dashboard(user_id: int, user_name: str, db: Database) -> (str
     missing_hops = max(0, recipe_hops - inventory['хмель'])
 
     text = (
-        f"{dash_title(user_name)}\n\n"
+        f"{dash_title(user_id, user_name)}\n\n"
         f"🍺 Рейтинг: <b>{rating}</b>\n"
         f"🌾 Зерно: <b>{inventory['зерно']}</b> / 🌱 Хмель: <b>{inventory['хмель']}</b>\n\n"
         f"{DIVIDER}\n"

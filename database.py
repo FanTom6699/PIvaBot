@@ -319,7 +319,7 @@ class Database:
     async def get_top_users(self, limit: int = 10):
         async with aiosqlite.connect(self.db_name) as db:
             cursor = await db.execute(
-                "SELECT first_name, last_name, beer_rating FROM users ORDER BY beer_rating DESC LIMIT ?", 
+                "SELECT user_id, first_name, last_name, beer_rating FROM users ORDER BY beer_rating DESC LIMIT ?",
                 (limit,)
             )
             return await cursor.fetchall()
@@ -349,7 +349,7 @@ class Database:
         async with aiosqlite.connect(self.db_name) as db:
             cursor = await db.execute(
                 """
-                SELECT U.first_name, U.last_name, U.beer_rating
+                SELECT U.user_id, U.first_name, U.last_name, U.beer_rating
                 FROM chat_members M
                 JOIN users U ON U.user_id = M.user_id
                 WHERE M.chat_id = ?
@@ -420,7 +420,7 @@ class Database:
         async with aiosqlite.connect(self.db_name) as db:
             cursor = await db.execute(
                 f"""
-                SELECT U.first_name, U.last_name, COALESCE(S.{column}, 0) AS total
+                SELECT U.user_id, U.first_name, U.last_name, COALESCE(S.{column}, 0) AS total
                 FROM users U
                 LEFT JOIN user_harvest_stats S ON U.user_id = S.user_id
                 WHERE COALESCE(S.{column}, 0) > 0

@@ -10,6 +10,7 @@ from aiogram.filters import Command
 from database import Database
 from .common import check_user_registered
 from .farm_config import FARM_ITEM_NAMES
+from utils import mention_user
 
 # --- ИНИЦИАЛИЗАЦИЯ ---
 give_router = Router()
@@ -142,5 +143,5 @@ async def cmd_give_item(message: Message, bot: Bot, db: Database):
     await message.reply(
         # ✅✅✅ ИСПРАВЛЕНИЕ: Используем escape()
         f"✅ <b>Передача Успешна!</b>\n\n"
-        f"<i>{escape(sender.full_name)}</i> передал {quantity} {item_name} игроку <i>{escape(target_user_name)}</i>!"
+        f"<i>{mention_user(sender.id, sender.full_name)}</i> передал {quantity} {item_name} игроку <i>{mention_user(target_user_id, target_user_name)}</i>!"
     )

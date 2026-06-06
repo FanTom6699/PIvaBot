@@ -6,7 +6,6 @@ from contextlib import suppress
 import logging
 from decimal import Decimal, ROUND_HALF_UP
 from typing import List
-from html import escape
 
 from aiogram import Router, F, Bot
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, User, Chat
@@ -19,6 +18,7 @@ import config
 from database import Database
 from settings import SettingsManager
 from .common import check_user_registered
+from utils import mention_user
 
 # --- ИНИЦИАЛИЗАЦИЯ ---
 ladder_router = Router()
@@ -195,7 +195,7 @@ async def end_ladder_game(bot: Bot, chat_id: int, user: User, game: LadderGameSt
     )
     keyboard = InlineKeyboardMarkup(inline_keyboard=[[play_again_button]])
     
-    player_name = escape(user.full_name)
+    player_name = mention_user(user.id, user.full_name)
     rewards = calculate_ladder_rewards(game.stake)
     
     if is_win:

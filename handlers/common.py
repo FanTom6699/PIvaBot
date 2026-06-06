@@ -9,7 +9,7 @@ from aiogram.filters.callback_data import CallbackData
 from database import Database
 from settings import SettingsManager
 from .beer_service import run_beer_attempt
-from utils import format_time_delta
+from utils import format_time_delta, mention_user, mention_user_from_parts
 
 common_router = Router()
 DIVIDER = "<code>--- --- ---</code>"
@@ -182,7 +182,7 @@ async def get_farm_profile_status(user_id: int, db: Database, show_inventory: bo
 
 
 async def get_profile_text(user_id: int, user_name: str, db: Database, settings: SettingsManager | None = None) -> str:
-    user_name = escape(user_name)
+    user_name = mention_user(user_id, user_name)
     profile = await db.get_user_profile(user_id)
     rating = profile[3] if profile else 0
     registration_date = format_registration_date(profile[5] if profile else None)
@@ -201,7 +201,7 @@ async def get_profile_text(user_id: int, user_name: str, db: Database, settings:
 
 
 async def get_compact_profile_text(user_id: int, user_name: str, db: Database, settings: SettingsManager | None = None) -> str:
-    user_name = escape(user_name)
+    user_name = mention_user(user_id, user_name)
     profile = await db.get_user_profile(user_id)
     rating = profile[3] if profile else 0
     registration_date = format_registration_date(profile[5] if profile else None)
@@ -261,11 +261,8 @@ async def get_top_text(db: Database, user_id: int | None = None) -> str:
         f"{DIVIDER}\n"
     )
     medals = ["🥇", "🥈", "🥉"]
-    for i, (first_name, last_name, rating) in enumerate(top_users):
-        name = first_name or "Игрок"
-        if last_name:
-            name += f" {last_name}"
-        name = escape(name)
+    for i, (top_user_id, first_name, last_name, rating) in enumerate(top_users):
+        name = mention_user_from_parts(top_user_id, first_name, last_name)
         place = medals[i] if i < len(medals) else f"{i + 1}."
         text += f"{place} {name} — {rating} 🍺\n"
 
@@ -295,11 +292,8 @@ async def get_chat_top_text(db: Database, chat_id: int, user_id: int | None = No
         f"{DIVIDER}\n"
     )
     medals = ["🥇", "🥈", "🥉"]
-    for i, (first_name, last_name, rating) in enumerate(top_users):
-        name = first_name or "Игрок"
-        if last_name:
-            name += f" {last_name}"
-        name = escape(name)
+    for i, (top_user_id, first_name, last_name, rating) in enumerate(top_users):
+        name = mention_user_from_parts(top_user_id, first_name, last_name)
         place = medals[i] if i < len(medals) else f"{i + 1}."
         text += f"{place} {name} — <b>{rating}</b> 🍺\n"
 
@@ -373,11 +367,8 @@ async def get_harvest_rating_text(db: Database, user_id: int | None, product_id:
         f"{DIVIDER}\n"
     )
     medals = ["🥇", "🥈", "🥉"]
-    for i, (first_name, last_name, total) in enumerate(top_users):
-        name = first_name or "Игрок"
-        if last_name:
-            name += f" {last_name}"
-        name = escape(name)
+    for i, (top_user_id, first_name, last_name, total) in enumerate(top_users):
+        name = mention_user_from_parts(top_user_id, first_name, last_name)
         place = medals[i] if i < len(medals) else f"{i + 1}."
         text += f"{place} {name} — <b>{total}</b> {item['emoji']}\n"
 

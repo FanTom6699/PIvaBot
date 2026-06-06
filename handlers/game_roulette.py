@@ -4,7 +4,6 @@ import random
 from datetime import datetime, timedelta
 from contextlib import suppress
 import logging
-from html import escape
 
 from aiogram import Router, Bot
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
@@ -15,7 +14,7 @@ from aiogram.exceptions import TelegramBadRequest
 from database import Database
 from settings import SettingsManager
 from .common import check_user_registered
-from utils import format_time_delta
+from utils import format_time_delta, mention_user
 
 # --- ИНИЦИАЛИЗАЦИЯ ---
 roulette_router = Router()
@@ -50,12 +49,12 @@ def get_roulette_keyboard(game: GameState) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[buttons])
 
 async def generate_lobby_text(game: GameState) -> str:
-    players_list = "\n".join(f"• {escape(p.full_name)}" for p in game.players.values())
+    players_list = "\n".join(f"• {mention_user(p.id, p.full_name)}" for p in game.players.values())
     return (
         "🎰 <b>Пивная рулетка</b>\n\n"
         "На стойке стоит общий банк. Один останется с кружкой, остальные уйдут без ставки.\n\n"
         f"{DIVIDER}\n"
-        f"Создатель: <b>{escape(game.creator.full_name)}</b>\n"
+        f"Создатель: <b>{mention_user(game.creator.id, game.creator.full_name)}</b>\n"
         f"Ставка: <b>{game.stake}</b> 🍺\n"
         f"Игроки: <b>{len(game.players)}/{game.max_players}</b>\n\n"
         f"{players_list}\n\n"
@@ -360,10 +359,10 @@ async def start_roulette_game(chat_id: int, bot: Bot, db: Database):
         await asyncio.sleep(5)
         loser = random.choice(players_in_game)
         players_in_game.remove(loser)
-        remaining_players_text = "\n".join(f"• {escape(p.full_name)}" for p in players_in_game)
+        remaining_players_text = "\n".join(f"• {mention_user(p.id, p.full_name)}" for p in players_in_game)
         await bot.send_message(
             chat_id,
-            text=get_roulette_elimination_text(escape(loser.full_name), remaining_players_text),
+            text=get_roulette_elimination_text(mention_user(loser.id, loser.full_name), remaining_players_text),
             parse_mode='HTML'
         )
         round_num += 1
@@ -372,10 +371,10 @@ async def start_roulette_game(chat_id: int, bot: Bot, db: Database):
     prize = game.stake * len(game.players)
     await db.change_rating(winner.id, prize)
     participants_text = "\n".join(
-        f"• {'🏆 ' if player.id == winner.id else ''}{escape(player.full_name)}"
+        f"• {'🏆 ' if player.id == winner.id else ''}{mention_user(player.id, player.full_name)}"
         for player in game.players.values()
     )
-    winner_text = get_roulette_winner_text(escape(winner.full_name), prize, participants_text)
+    winner_text = get_roulette_winner_text(mention_user(winner.id, winner.full_name), prize, participants_text)
     await bot.send_message(chat_id, text=winner_text, parse_mode='HTML')
     del active_games[chat_id]
     chat_cooldowns[chat_id] = datetime.now()

@@ -1,4 +1,5 @@
 from datetime import timedelta
+from html import escape
 
 
 active_lobby_timers = {}
@@ -36,3 +37,15 @@ def format_time_left(total_seconds: int) -> str:
     if hours > 0:
         return f"{hours}:{minutes:02d}:{seconds:02d}"
     return f"{minutes}:{seconds:02d}"
+
+
+def mention_user(user_id: int, name: str | None) -> str:
+    safe_name = escape(name or "Игрок")
+    return f'<a href="tg://user?id={user_id}">{safe_name}</a>'
+
+
+def mention_user_from_parts(user_id: int, first_name: str | None, last_name: str | None = None) -> str:
+    name = first_name or "Игрок"
+    if last_name:
+        name += f" {last_name}"
+    return mention_user(user_id, name)
