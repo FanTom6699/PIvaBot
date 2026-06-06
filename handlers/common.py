@@ -82,7 +82,7 @@ def get_chat_top_picker_keyboard(chats) -> InlineKeyboardMarkup:
 
 def get_chat_top_back_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="⬅️ Назад к чатам", callback_data=MainMenuCallback(action="rating").pack())],
+        [InlineKeyboardButton(text="⬅️ Назад к чатам", callback_data=MainMenuCallback(action="chat_top_picker").pack())],
         [InlineKeyboardButton(text="⬅️ Назад в меню", callback_data=MainMenuCallback(action="home").pack())],
     ])
 
@@ -407,7 +407,7 @@ def get_help_text() -> str:
         "<b>Основное:</b>\n"
         "• <code>/start</code> - Зарегистрироваться или проверить свой профиль.\n"
         "• <code>/beer</code> - Испытать удачу (раз в 2 часа).\n"
-        "• <code>/top</code> - Открыть топ игроков.\n"
+        "• <code>/top</code> - Открыть топ чата.\n"
         "• <code>/jackpot</code> - Проверить текущий джекпот.\n\n"
         f"{DIVIDER}\n"
         "<b>Мини-игры:</b>\n"
@@ -504,6 +504,10 @@ async def cq_main_menu(callback: CallbackQuery, callback_data: MainMenuCallback,
     elif callback_data.action == "rating":
         text = get_rating_menu_text()
         keyboard = get_rating_keyboard()
+    elif callback_data.action == "chat_top_picker":
+        chats = await get_available_user_chats(db, bot, user.id)
+        text = get_chat_top_picker_text(chats)
+        keyboard = get_chat_top_picker_keyboard(chats)
     elif callback_data.action == "rating_beer":
         text = await get_top_text(db, user.id)
         keyboard = get_back_to_rating_keyboard()
