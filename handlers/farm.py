@@ -14,6 +14,7 @@ from aiogram.exceptions import TelegramBadRequest
 
 from database import Database
 from .common import check_user_registered, get_main_menu_keyboard, get_private_start_text
+from .text_aliases import FARM_ALIASES, GroupTextAlias
 from utils import format_time_delta, mention_user
 
 from .farm_config import (
@@ -403,6 +404,11 @@ async def cmd_farm(message: Message, bot: Bot, db: Database):
     except Exception as e:
         logging.error(f"Critical error in cmd_farm: {e}", exc_info=True)
         await message.answer("⛔ Ошибка при загрузке Фермы!")
+
+@farm_router.message(GroupTextAlias(*FARM_ALIASES))
+async def alias_farm(message: Message, bot: Bot, db: Database):
+    await cmd_farm(message, bot, db)
+
 
 @farm_router.callback_query(FarmCallback.filter(F.action == "main_dashboard"))
 async def cq_farm_main_dashboard(callback: CallbackQuery, callback_data: FarmCallback, db: Database):

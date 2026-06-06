@@ -9,6 +9,7 @@ from aiogram.filters.callback_data import CallbackData
 from database import Database
 from settings import SettingsManager
 from .beer_service import run_beer_attempt
+from .text_aliases import HELP_ALIASES, JACKPOT_ALIASES, GroupTextAlias
 from utils import format_time_delta, mention_user, mention_user_from_parts
 
 common_router = Router()
@@ -482,6 +483,11 @@ async def cmd_help(message: Message):
     await message.answer(get_help_text(), parse_mode='HTML')
 
 
+@common_router.message(GroupTextAlias(*HELP_ALIASES))
+async def alias_help(message: Message):
+    await cmd_help(message)
+
+
 @common_router.callback_query(MainMenuCallback.filter())
 async def cq_main_menu(callback: CallbackQuery, callback_data: MainMenuCallback, bot: Bot, db: Database, settings: SettingsManager):
     user = callback.from_user
@@ -576,3 +582,8 @@ async def cmd_id(message: Message):
 async def cmd_jackpot(message: Message, db: Database):
     current_jackpot = await db.get_jackpot()
     await message.answer(get_jackpot_text(current_jackpot), parse_mode='HTML')
+
+
+@common_router.message(GroupTextAlias(*JACKPOT_ALIASES))
+async def alias_jackpot(message: Message, db: Database):
+    await cmd_jackpot(message, db)

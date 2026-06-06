@@ -1,6 +1,6 @@
 # handlers/user_commands.py
 from aiogram import Router, Bot
-from aiogram.types import Message
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
 from aiogram.filters import Command
 
 from database import Database
@@ -18,9 +18,29 @@ from .common import (
     get_rating_keyboard,
     get_rating_menu_text,
 )
+from .text_aliases import (
+    BEER_ALIASES,
+    CHAT_TOP_ALIASES,
+    GLOBAL_RATING_ALIASES,
+    GroupTextAlias,
+    PROFILE_ALIASES,
+)
 
 # --- ИНИЦИАЛИЗАЦИЯ --
 user_commands_router = Router()
+
+
+async def send_private_rating_prompt(message: Message, bot: Bot):
+    me = await bot.get_me()
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="🏆 Открыть рейтинг", url=f"https://t.me/{me.username}?start=menu")
+    ]])
+    text = (
+        "🏆 <b>Глобальный рейтинг</b>\n\n"
+        "Общий рейтинг открывается в личке с ботом.\n"
+        "Там можно выбрать 🍺 пиво, 🌾 зерно или 🌱 хмель."
+    )
+    await message.answer(text, reply_markup=keyboard, parse_mode='HTML')
 
 # --- ✅✅✅ ИСПРАВЛЕННАЯ КОМАНДА /beer ✅✅✅ ---
 @user_commands_router.message(Command("beer"))
@@ -46,6 +66,11 @@ async def cmd_beer(message: Message, bot: Bot, db: Database, settings: SettingsM
 # --- ---
 
 
+@user_commands_router.message(GroupTextAlias(*BEER_ALIASES))
+async def alias_beer(message: Message, bot: Bot, db: Database, settings: SettingsManager):
+    await cmd_beer(message, bot, db, settings)
+
+
 @user_commands_router.message(Command("top"))
 async def cmd_top(message: Message, bot: Bot, db: Database):
     # (Проверка регистрации в группе)
@@ -66,9 +91,15 @@ async def cmd_top(message: Message, bot: Bot, db: Database):
         await message.answer(text, parse_mode='HTML')
 
 
+@user_commands_router.message(GroupTextAlias(*CHAT_TOP_ALIASES))
+async def alias_top(message: Message, bot: Bot, db: Database):
+    await cmd_top(message, bot, db)
+
+
 @user_commands_router.message(Command("rating"))
-async def cmd_rating(message: Message, db: Database):
+async def cmd_rating(message: Message, bot: Bot, db: Database):
     if message.chat.type != 'private':
+        await send_private_rating_prompt(message, bot)
         return
 
     user = message.from_user
@@ -78,6 +109,11 @@ async def cmd_rating(message: Message, db: Database):
         reply_markup=get_rating_keyboard(),
         parse_mode='HTML'
     )
+
+
+@user_commands_router.message(GroupTextAlias(*GLOBAL_RATING_ALIASES))
+async def alias_rating(message: Message, bot: Bot):
+    await send_private_rating_prompt(message, bot)
 
 
 @user_commands_router.message(Command("me"))
@@ -93,6 +129,11 @@ async def cmd_me(message: Message, bot: Bot, db: Database, settings: SettingsMan
     else:
         text = await get_compact_profile_text(user.id, user.full_name, db, settings)
         await message.answer(text, parse_mode='HTML')
+
+
+@user_commands_router.message(GroupTextAlias(*PROFILE_ALIASES))
+async def alias_me(message: Message, bot: Bot, db: Database, settings: SettingsManager):
+    await cmd_me(message, bot, db, settings)
 
 
 # --- ПРОФИЛЬ ---
