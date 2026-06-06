@@ -74,6 +74,15 @@ def get_beer_status(last_beer_time: datetime | None, settings: SettingsManager |
     return "готово"
 
 
+def format_registration_date(created_at: str | None) -> str:
+    if not created_at:
+        return "—"
+    try:
+        return datetime.fromisoformat(created_at).strftime("%d.%m.%Y")
+    except ValueError:
+        return "—"
+
+
 async def get_farm_profile_status(user_id: int, db: Database, show_inventory: bool = False) -> str:
     farm = await db.get_user_farm_data(user_id)
     inventory = await db.get_user_inventory(user_id)
@@ -131,6 +140,7 @@ async def get_profile_text(user_id: int, user_name: str, db: Database, settings:
     user_name = escape(user_name)
     profile = await db.get_user_profile(user_id)
     rating = profile[3] if profile else 0
+    registration_date = format_registration_date(profile[5] if profile else None)
     rank = await db.get_user_rank(user_id)
     rank_text = f"#{rank['rank']}" if rank else "—"
     beer_status = get_beer_status(await db.get_last_beer_time(user_id), settings)
@@ -142,7 +152,8 @@ async def get_profile_text(user_id: int, user_name: str, db: Database, settings:
         f"{DIVIDER}\n"
         f"Статус: <b>{get_rating_title(rating)}</b>\n"
         f"Рейтинг: <b>{rating}</b> 🍺\n"
-        f"Место: <b>{rank_text}</b>\n\n"
+        f"Место: <b>{rank_text}</b>\n"
+        f"В баре с: <b>{registration_date}</b>\n\n"
         f"🍺 <b>Бар:</b> {beer_status}\n\n"
         f"🌾 <b>Ферма</b>\n"
         f"{farm_status}\n\n"
@@ -155,6 +166,7 @@ async def get_compact_profile_text(user_id: int, user_name: str, db: Database, s
     user_name = escape(user_name)
     profile = await db.get_user_profile(user_id)
     rating = profile[3] if profile else 0
+    registration_date = format_registration_date(profile[5] if profile else None)
     rank = await db.get_user_rank(user_id)
     rank_text = f"#{rank['rank']}" if rank else "—"
     beer_status = get_beer_status(await db.get_last_beer_time(user_id), settings)
@@ -164,6 +176,7 @@ async def get_compact_profile_text(user_id: int, user_name: str, db: Database, s
         f"👤 <b>{user_name}</b>\n\n"
         f"Статус: <b>{get_rating_title(rating)}</b>\n"
         f"Место в топе: <b>{rank_text}</b>\n"
+        f"В баре с: <b>{registration_date}</b>\n"
         f"Бар: <b>{beer_status}</b>\n\n"
         f"🌾 <b>Ферма</b>\n"
         f"{farm_status}"

@@ -21,14 +21,20 @@ class Database:
             # --- ОСНОВНЫЕ ТАБЛИЦЫ ---
             await db.execute('''
                 CREATE TABLE IF NOT EXISTS users (
-                    user_id INTEGER PRIMARY KEY, 
-                    first_name TEXT, 
+                    user_id INTEGER PRIMARY KEY,
+                    first_name TEXT,
                     last_name TEXT,
-                    username TEXT, 
-                    beer_rating INTEGER DEFAULT 0, 
-                    last_beer_time TEXT
+                    username TEXT,
+                    beer_rating INTEGER DEFAULT 0,
+                    last_beer_time TEXT,
+                    created_at TEXT
                 )
             ''')
+            await self._ensure_column(db, "users", "created_at", "TEXT")
+            await db.execute(
+                "UPDATE users SET created_at = ? WHERE created_at IS NULL",
+                (datetime.now().isoformat(),)
+            )
             await db.execute('CREATE TABLE IF NOT EXISTS chats (chat_id INTEGER PRIMARY KEY, title TEXT)')
             await db.execute('CREATE TABLE IF NOT EXISTS game_data (key TEXT PRIMARY KEY, value INTEGER)')
             # --- ТАБЛИЦЫ ФЕРМЫ ---
@@ -140,6 +146,12 @@ class Database:
 
     # --- ОБЩИЕ МЕТОДЫ ---
 
+    async def _ensure_column(self, db: aiosqlite.Connection, table: str, column: str, column_type: str):
+        cursor = await db.execute(f"PRAGMA table_info({table})")
+        columns = [row[1] for row in await cursor.fetchall()]
+        if column not in columns:
+            await db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {column_type}")
+
     async def user_exists(self, user_id: int) -> bool:
         async with aiosqlite.connect(self.db_name) as db:
             cursor = await db.execute("SELECT 1 FROM users WHERE user_id = ?", (user_id,))
@@ -147,9 +159,10 @@ class Database:
 
     async def add_user(self, user_id: int, first_name: str, last_name: str, username: str):
         async with aiosqlite.connect(self.db_name) as db:
+            now_iso = datetime.now().isoformat()
             await db.execute(
-                "INSERT OR IGNORE INTO users (user_id, first_name, last_name, username) VALUES (?, ?, ?, ?)",
-                (user_id, first_name, last_name, username)
+                "INSERT OR IGNORE INTO users (user_id, first_name, last_name, username, created_at) VALUES (?, ?, ?, ?, ?)",
+                (user_id, first_name, last_name, username, now_iso)
             )
             await db.execute(
                 "UPDATE users SET first_name = ?, last_name = ?, username = ? WHERE user_id = ?",
@@ -204,7 +217,7 @@ class Database:
     async def get_user_profile(self, user_id: int):
         async with aiosqlite.connect(self.db_name) as db:
             cursor = await db.execute(
-                "SELECT first_name, last_name, username, beer_rating, last_beer_time FROM users WHERE user_id = ?", 
+                "SELECT first_name, last_name, username, beer_rating, last_beer_time, created_at FROM users WHERE user_id = ?",
                 (user_id,)
             )
             return await cursor.fetchone()
