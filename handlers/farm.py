@@ -751,8 +751,11 @@ async def cq_farm_upgrades(callback: CallbackQuery, callback_data: FarmCallback,
     f_current = get_level_data(f_lvl, FIELD_UPGRADES)
     text += f"🌾 <b>Поле</b> · ур. <b>{f_lvl}</b>\n"
     text += (
-        f"Грядки: <b>{f_current.get('plots', '??')}</b> · "
-        f"x2: <b>{f_current.get('chance_x2', '??')}%</b>\n"
+        "<b>Сейчас:</b>\n"
+        f"• Грядки: <b>{f_current.get('plots', '??')}</b>\n"
+        f"• Шанс x2: <b>{f_current.get('chance_x2', '??')}%</b>\n"
+        f"• Рост: 🌾 <b>{f_current.get('grow_time_min', {}).get('зерно', '??')}м</b> / "
+        f"🌱 <b>{f_current.get('grow_time_min', {}).get('хмель', '??')}м</b>\n"
     )
     if farm.get('field_upgrade_timer_end'):
         left = format_time_delta(farm['field_upgrade_timer_end'] - datetime.now())
@@ -763,9 +766,12 @@ async def cq_farm_upgrades(callback: CallbackQuery, callback_data: FarmCallback,
         f_next = get_level_data(f_lvl + 1, FIELD_UPGRADES)
         cost = f_next['cost']
         text += (
-            f"Следующий: грядки <b>{f_next.get('plots', '??')}</b>, "
-            f"x2 <b>{f_next.get('chance_x2', '??')}%</b>\n"
-            f"Цена: <b>{cost}</b> 🍺 · Время: <b>{f_next['time_h']} ч</b>\n"
+            f"<b>После улучшения · ур. {f_lvl + 1}:</b>\n"
+            f"• Грядки: <b>{f_next.get('plots', '??')}</b>\n"
+            f"• Шанс x2: <b>{f_next.get('chance_x2', '??')}%</b>\n"
+            f"• Рост: 🌾 <b>{f_next.get('grow_time_min', {}).get('зерно', '??')}м</b> / "
+            f"🌱 <b>{f_next.get('grow_time_min', {}).get('хмель', '??')}м</b>\n"
+            f"<b>Стоимость:</b> {cost} 🍺 · <b>Время:</b> {f_next['time_h']} ч\n"
         )
         if not field_is_free:
             text += "<i>Перед улучшением поле должно быть свободным.</i>\n"
@@ -779,8 +785,9 @@ async def cq_farm_upgrades(callback: CallbackQuery, callback_data: FarmCallback,
     b_current = get_level_data(b_lvl, BREWERY_UPGRADES)
     text += f"🏭 <b>Пивоварня</b> · ур. <b>{b_lvl}</b>\n"
     text += (
-        f"Награда: <b>+{b_current.get('reward', '??')}</b> 🍺 · "
-        f"Варка: <b>{b_current.get('brew_time_min', '??')}м</b>\n"
+        "<b>Сейчас:</b>\n"
+        f"• Награда: <b>+{b_current.get('reward', '??')}</b> 🍺\n"
+        f"• Варка: <b>{b_current.get('brew_time_min', '??')}м</b>\n"
     )
     if farm.get('brewery_upgrade_timer_end'):
         left = format_time_delta(farm['brewery_upgrade_timer_end'] - datetime.now())
@@ -791,9 +798,10 @@ async def cq_farm_upgrades(callback: CallbackQuery, callback_data: FarmCallback,
         b_next = get_level_data(b_lvl + 1, BREWERY_UPGRADES)
         cost = b_next['cost']
         text += (
-            f"Следующий: <b>+{b_next.get('reward', '??')}</b> 🍺, "
-            f"варка <b>{b_next.get('brew_time_min', '??')}м</b>\n"
-            f"Цена: <b>{cost}</b> 🍺 · Время: <b>{b_next['time_h']} ч</b>\n"
+            f"<b>После улучшения · ур. {b_lvl + 1}:</b>\n"
+            f"• Награда: <b>+{b_next.get('reward', '??')}</b> 🍺\n"
+            f"• Варка: <b>{b_next.get('brew_time_min', '??')}м</b>\n"
+            f"<b>Стоимость:</b> {cost} 🍺 · <b>Время:</b> {b_next['time_h']} ч\n"
         )
         if not brewery_is_free:
             text += "<i>Перед улучшением пивоварня должна быть свободной.</i>\n"
