@@ -143,8 +143,6 @@ async def get_profile_text(user_id: int, user_name: str, db: Database, settings:
     registration_date = format_registration_date(profile[5] if profile else None)
     rank = await db.get_user_rank(user_id)
     rank_text = f"#{rank['rank']}" if rank else "—"
-    beer_status = get_beer_status(await db.get_last_beer_time(user_id), settings)
-    farm_status = await get_farm_profile_status(user_id, db, show_inventory=True)
 
     return (
         f"👤 <b>Профиль</b>\n\n"
@@ -153,12 +151,7 @@ async def get_profile_text(user_id: int, user_name: str, db: Database, settings:
         f"Статус: <b>{get_rating_title(rating)}</b>\n"
         f"Рейтинг: <b>{rating}</b> 🍺\n"
         f"Место: <b>{rank_text}</b>\n"
-        f"В баре с: <b>{registration_date}</b>\n\n"
-        f"🍺 <b>Бар:</b> {beer_status}\n\n"
-        f"🌾 <b>Ферма</b>\n"
-        f"{farm_status}\n\n"
-        f"{DIVIDER}\n"
-        "<i>В группе можно быстро смотреть себя через /me.</i>"
+        f"В баре с: <b>{registration_date}</b>"
     )
 
 
@@ -169,17 +162,12 @@ async def get_compact_profile_text(user_id: int, user_name: str, db: Database, s
     registration_date = format_registration_date(profile[5] if profile else None)
     rank = await db.get_user_rank(user_id)
     rank_text = f"#{rank['rank']}" if rank else "—"
-    beer_status = get_beer_status(await db.get_last_beer_time(user_id), settings)
-    farm_status = await get_farm_profile_status(user_id, db, show_inventory=False)
 
     return (
         f"👤 <b>{user_name}</b>\n\n"
         f"Статус: <b>{get_rating_title(rating)}</b>\n"
         f"Место в топе: <b>{rank_text}</b>\n"
-        f"В баре с: <b>{registration_date}</b>\n"
-        f"Бар: <b>{beer_status}</b>\n\n"
-        f"🌾 <b>Ферма</b>\n"
-        f"{farm_status}"
+        f"В баре с: <b>{registration_date}</b>"
     )
 
 
