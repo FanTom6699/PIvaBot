@@ -153,6 +153,56 @@ def get_roulette_winner_text(winner_name: str, prize: int) -> str:
     )
 
 
+def get_roulette_elimination_text(loser_name: str, remaining_players_text: str) -> str:
+    templates = [
+        (
+            "💥 <b>Кружка дрогнула</b>\n\n"
+            "<b>{name}</b> покидает стойку."
+        ),
+        (
+            "🍺 <b>Пена осела</b>\n\n"
+            "<b>{name}</b> не выдержал барабан."
+        ),
+        (
+            "🎰 <b>Барабан выбрал</b>\n\n"
+            "<b>{name}</b> выходит из игры."
+        ),
+        (
+            "🪑 <b>Стул свободен</b>\n\n"
+            "<b>{name}</b> покидает барную стойку."
+        ),
+        (
+            "🔥 <b>Раунд прожарил</b>\n\n"
+            "<b>{name}</b> теряет ставку и уступает место."
+        ),
+        (
+            "🥴 <b>Кружка оказалась крепкой</b>\n\n"
+            "<b>{name}</b> больше не держит темп."
+        ),
+        (
+            "🍻 <b>Тост не зашел</b>\n\n"
+            "<b>{name}</b> выбывает из рулетки."
+        ),
+        (
+            "💣 <b>Барный щелчок</b>\n\n"
+            "<b>{name}</b> уходит от стойки без банка."
+        ),
+        (
+            "🧊 <b>Удача остыла</b>\n\n"
+            "<b>{name}</b> не проходит этот круг."
+        ),
+        (
+            "⚡ <b>Барабан ударил резко</b>\n\n"
+            "<b>{name}</b> покидает игру."
+        ),
+    ]
+    return (
+        random.choice(templates).format(name=loser_name)
+        + f"\n\n{DIVIDER}\n"
+        + f"<b>Остались у стойки:</b>\n{remaining_players_text}"
+    )
+
+
 @roulette_router.message(Command("roulette"))
 async def cmd_roulette(message: Message, bot: Bot, db: Database, settings: SettingsManager):
     if message.chat.type == 'private':
@@ -207,7 +257,6 @@ async def cmd_roulette(message: Message, bot: Bot, db: Database, settings: Setti
     lobby_message = await message.answer("🎰 Крупье ставит кружки на стойку...")
     game = GameState(creator, stake, max_players, lobby_message.message_id)
     active_games[chat_id] = game
-    with suppress(TelegramBadRequest): await bot.pin_chat_message(chat_id=chat_id, message_id=lobby_message.message_id, disable_notification=True)
     await lobby_message.edit_text(await generate_lobby_text(game), reply_markup=get_roulette_keyboard(game), parse_mode='HTML')
     game.task = asyncio.create_task(schedule_game_start(chat_id, bot, db))
 
@@ -284,18 +333,17 @@ async def schedule_game_start(chat_id: int, bot: Bot, db: Database):
 async def start_roulette_game(chat_id: int, bot: Bot, db: Database):
     if chat_id not in active_games: return
     game = active_games[chat_id]
-    with suppress(TelegramBadRequest): await bot.unpin_chat_message(chat_id=chat_id, message_id=game.lobby_message_id)
-    await bot.edit_message_text(
+    with suppress(TelegramBadRequest):
+        await bot.delete_message(chat_id=chat_id, message_id=game.lobby_message_id)
+    await bot.send_message(
+        chat_id=chat_id,
         text=(
             "🎰 <b>Пивная рулетка</b>\n\n"
-            "Все места заняты. Кружки на кону, барабан пошел.\n\n"
+            "Лобби закрыто. Кружки на кону, барабан пошел.\n\n"
             f"{DIVIDER}\n"
             f"Ставка каждого: <b>{game.stake}</b> 🍺\n"
             f"Банк: <b>{game.stake * len(game.players)}</b> 🍺"
         ),
-        chat_id=chat_id,
-        message_id=game.lobby_message_id,
-        reply_markup=None,
         parse_mode='HTML'
     )
     await asyncio.sleep(3)
@@ -313,12 +361,7 @@ async def start_roulette_game(chat_id: int, bot: Bot, db: Database):
         remaining_players_text = "\n".join(f"• {escape(p.full_name)}" for p in players_in_game)
         await bot.send_message(
             chat_id,
-            text=(
-                "💥 <b>Минус кружка</b>\n\n"
-                f"Выбывает: <b>{escape(loser.full_name)}</b>\n\n"
-                f"{DIVIDER}\n"
-                f"<b>Остались у стойки:</b>\n{remaining_players_text}"
-            ),
+            text=get_roulette_elimination_text(escape(loser.full_name), remaining_players_text),
             parse_mode='HTML'
         )
         round_num += 1
@@ -327,14 +370,6 @@ async def start_roulette_game(chat_id: int, bot: Bot, db: Database):
     prize = game.stake * len(game.players)
     await db.change_rating(winner.id, prize)
     winner_text = get_roulette_winner_text(escape(winner.full_name), prize)
-    winner_message = await bot.send_message(chat_id, text=winner_text, parse_mode='HTML')
-    with suppress(TelegramBadRequest):
-        await bot.pin_chat_message(chat_id=chat_id, message_id=winner_message.message_id, disable_notification=True)
-        asyncio.create_task(unpin_after_delay(chat_id, winner_message.message_id, bot, 120))
+    await bot.send_message(chat_id, text=winner_text, parse_mode='HTML')
     del active_games[chat_id]
     chat_cooldowns[chat_id] = datetime.now()
-
-async def unpin_after_delay(chat_id: int, message_id: int, bot: Bot, delay: int):
-    await asyncio.sleep(delay)
-    with suppress(TelegramBadRequest):
-        await bot.unpin_chat_message(chat_id=chat_id, message_id=message_id)
