@@ -50,6 +50,21 @@ LADDER_INACTIVITY_TIMEOUT_SECONDS = 60
 active_ladder_games = {}
 
 LADDER_MULTIPLIERS = [1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 2.0, 2.2, 2.5]
+LADDER_LEVEL_LINES = [
+    "Первая ступень перед тобой. Бар пока только присматривается.",
+    "Ты поднялся на первую ступень. Пена дрогнула, но кружка держится.",
+    "Вторая ступень позади. У стойки уже начали считать твой выигрыш.",
+    "Третий шаг взят. Лестница скрипит громче, но ты идешь ровно.",
+    "Четвертая ступень. Назад еще не поздно, но впереди вкуснее.",
+    "Половина пути. Бармен смотрит внимательнее.",
+    "Шестая ступень. Ставки пахнут опасно, но красиво.",
+    "Седьмой шаг. В баре стало тише, все следят за кружкой.",
+    "Восьмая ступень. Еще немного, и это уже история для вечера.",
+    "Девятая ступень. Даже кружка нервничает.",
+    "Последняя ступень взята. Это уже легенда бара.",
+]
+
+
 def calculate_ladder_rewards(stake: int) -> List[int]:
     rewards = []
     current_win = Decimal(stake)
@@ -126,7 +141,20 @@ async def generate_ladder_keyboard(game: LadderGameState, rewards: List[int], re
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 async def generate_ladder_text(game: LadderGameState) -> str:
-    return (f"🪜 <b>Пивная Лесенка</b> 🪜\n\n" f"Ставка: <b>{game.stake} 🍺</b> | Текущий выигрыш: <b>{game.current_win} 🍺</b>")
+    completed_level = max(0, min(game.current_level - 1, LADDER_LEVELS))
+    rewards = calculate_ladder_rewards(game.stake)
+    next_step = ""
+    if game.current_level <= LADDER_LEVELS:
+        next_step = f"\nСледующий шаг: <b>{rewards[game.current_level - 1]}</b> 🍺"
+
+    return (
+        "🪜 <b>Пивная Лесенка</b>\n\n"
+        f"Ставка: <b>{game.stake}</b> 🍺\n"
+        f"Текущий выигрыш: <b>{game.current_win}</b> 🍺\n"
+        f"Этаж: <b>{completed_level}/{LADDER_LEVELS}</b>\n\n"
+        f"{LADDER_LEVEL_LINES[completed_level]}"
+        f"{next_step}"
+    )
 
 async def cancel_ladder_game(bot: Bot, db: Database, game: LadderGameState, reason: str) -> None:
     game.is_finished = True
@@ -173,7 +201,12 @@ async def end_ladder_game(bot: Bot, chat_id: int, user: User, game: LadderGameSt
     if is_win:
         win_amount = game.current_win if game.current_win > 0 else game.stake
         await db.change_rating(game.player_id, win_amount)
-        text = f"🎉 <b>Победа в Лесенке!</b> 🎉\n\nИгрок: <b>{player_name}</b>\nЗабрал выигрыш: <b>+{win_amount} 🍺</b>"
+        text = (
+            "🎉 <b>Победа в Лесенке!</b> 🎉\n\n"
+            f"{LADDER_LEVEL_LINES[LADDER_LEVELS]}\n\n"
+            f"Игрок: <b>{player_name}</b>\n"
+            f"Забрал выигрыш: <b>+{win_amount} 🍺</b>"
+        )
         final_board_text = await generate_final_board_text(game, rewards, is_win=True)
     else:
         text = f"💥 <b>Неудача в Лесенке!</b> 💥\n\nИгрок: <b>{player_name}</b>\nОшибка на Уровне {game.current_level}!\nСтавка <b>{game.stake} 🍺</b> сгорела."
