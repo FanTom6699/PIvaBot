@@ -58,6 +58,7 @@ async def setup_bot_commands(bot: Bot):
         BotCommand(command="me", description="👤 Мой краткий профиль"),
         BotCommand(command="farm", description="🌾 Ферма и пивоварня"),
         BotCommand(command="top", description="🏆 Топ пива в чате"),
+        BotCommand(command="rating", description="🌐 Глобальный рейтинг"),
         BotCommand(command="jackpot", description="🎁 Общий банк удачи"),
         BotCommand(command="help", description="❓ Помощь и правила"),
     ])
