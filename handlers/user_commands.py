@@ -1,6 +1,6 @@
 # handlers/user_commands.py
 from aiogram import Router, Bot
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
+from aiogram.types import Message
 from aiogram.filters import Command
 
 from database import Database
@@ -16,14 +16,19 @@ from .common import (
     get_compact_profile_text,
     get_profile_keyboard,
     get_profile_text,
+    get_harvest_rating_text,
     get_rating_keyboard,
     get_rating_menu_text,
+    get_top_text,
 )
 from .text_aliases import (
     BEER_ALIASES,
+    BEER_RATING_ALIASES,
     CHAT_TOP_ALIASES,
+    GRAIN_RATING_ALIASES,
     GLOBAL_RATING_ALIASES,
     GroupTextAlias,
+    HOPS_RATING_ALIASES,
     PROFILE_ALIASES,
 )
 
@@ -31,17 +36,13 @@ from .text_aliases import (
 user_commands_router = Router()
 
 
-async def send_private_rating_prompt(message: Message, bot: Bot):
-    me = await bot.get_me()
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="🏆 Открыть рейтинг", url=f"https://t.me/{me.username}?start=menu")
-    ]])
-    text = (
-        "🏆 <b>Глобальный рейтинг</b>\n\n"
-        "Общий рейтинг открывается в личке с ботом.\n"
-        "Там можно выбрать 🍺 пиво, 🌾 зерно или 🌱 хмель."
+async def send_rating_menu(message: Message):
+    await answer_to_trigger(
+        message,
+        get_rating_menu_text(),
+        reply_markup=get_rating_keyboard(message.chat.type == "private"),
+        parse_mode='HTML'
     )
-    await answer_to_trigger(message, text, reply_markup=keyboard, parse_mode='HTML')
 
 # --- ✅✅✅ ИСПРАВЛЕННАЯ КОМАНДА /beer ✅✅✅ ---
 @user_commands_router.message(Command("beer"))
@@ -99,24 +100,34 @@ async def alias_top(message: Message, bot: Bot, db: Database):
 
 
 @user_commands_router.message(Command("rating"))
-async def cmd_rating(message: Message, bot: Bot, db: Database):
-    if message.chat.type != 'private':
-        await send_private_rating_prompt(message, bot)
-        return
-
+async def cmd_rating(message: Message, db: Database):
     user = message.from_user
-    await db.add_user(user.id, user.first_name, user.last_name, user.username)
-    await answer_to_trigger(
-        message,
-        get_rating_menu_text(),
-        reply_markup=get_rating_keyboard(),
-        parse_mode='HTML'
-    )
+    if message.chat.type == 'private':
+        await db.add_user(user.id, user.first_name, user.last_name, user.username)
+    await send_rating_menu(message)
 
 
 @user_commands_router.message(GroupTextAlias(*GLOBAL_RATING_ALIASES))
-async def alias_rating(message: Message, bot: Bot):
-    await send_private_rating_prompt(message, bot)
+async def alias_rating(message: Message):
+    await send_rating_menu(message)
+
+
+@user_commands_router.message(GroupTextAlias(*BEER_RATING_ALIASES))
+async def alias_rating_beer(message: Message, db: Database):
+    text = await get_top_text(db, message.from_user.id)
+    await answer_to_trigger(message, text, parse_mode='HTML')
+
+
+@user_commands_router.message(GroupTextAlias(*GRAIN_RATING_ALIASES))
+async def alias_rating_grain(message: Message, db: Database):
+    text = await get_harvest_rating_text(db, message.from_user.id, "зерно")
+    await answer_to_trigger(message, text, parse_mode='HTML')
+
+
+@user_commands_router.message(GroupTextAlias(*HOPS_RATING_ALIASES))
+async def alias_rating_hops(message: Message, db: Database):
+    text = await get_harvest_rating_text(db, message.from_user.id, "хмель")
+    await answer_to_trigger(message, text, parse_mode='HTML')
 
 
 @user_commands_router.message(Command("me"))

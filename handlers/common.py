@@ -47,22 +47,26 @@ def get_back_to_menu_keyboard() -> InlineKeyboardMarkup:
     ]])
 
 
-def get_rating_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[
+def get_rating_keyboard(show_main_menu: bool = True) -> InlineKeyboardMarkup:
+    rows = [
         [InlineKeyboardButton(text="🍺 Пиво", callback_data=MainMenuCallback(action="rating_beer").pack())],
         [
             InlineKeyboardButton(text="🌾 Зерно", callback_data=MainMenuCallback(action="rating_grain").pack()),
             InlineKeyboardButton(text="🌱 Хмель", callback_data=MainMenuCallback(action="rating_hops").pack()),
         ],
-        [InlineKeyboardButton(text="⬅️ Назад в меню", callback_data=MainMenuCallback(action="home").pack())],
-    ])
+    ]
+    if show_main_menu:
+        rows.append([InlineKeyboardButton(text="⬅️ Назад в меню", callback_data=MainMenuCallback(action="home").pack())])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def get_back_to_rating_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[
+def get_back_to_rating_keyboard(show_main_menu: bool = True) -> InlineKeyboardMarkup:
+    rows = [
         [InlineKeyboardButton(text="⬅️ Назад к рейтингу", callback_data=MainMenuCallback(action="rating").pack())],
-        [InlineKeyboardButton(text="⬅️ Назад в меню", callback_data=MainMenuCallback(action="home").pack())],
-    ])
+    ]
+    if show_main_menu:
+        rows.append([InlineKeyboardButton(text="⬅️ Назад в меню", callback_data=MainMenuCallback(action="home").pack())])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def crop_button_text(text: str, limit: int = 32) -> str:
@@ -494,6 +498,9 @@ async def cq_main_menu(callback: CallbackQuery, callback_data: MainMenuCallback,
     await db.add_user(user.id, user.first_name, user.last_name, user.username)
 
     if callback_data.action == "home":
+        if callback.message.chat.type != "private":
+            await callback.answer("Главное меню открывается в личке с ботом.", show_alert=True)
+            return
         text = get_private_start_text(user.full_name, False)
         keyboard = get_main_menu_keyboard(user.id)
     elif callback_data.action == "profile":
@@ -501,20 +508,20 @@ async def cq_main_menu(callback: CallbackQuery, callback_data: MainMenuCallback,
         keyboard = get_profile_keyboard(user.id)
     elif callback_data.action == "rating":
         text = get_rating_menu_text()
-        keyboard = get_rating_keyboard()
+        keyboard = get_rating_keyboard(callback.message.chat.type == "private")
     elif callback_data.action == "chat_top_picker":
         chats = await get_available_user_chats(db, bot, user.id)
         text = get_chat_top_picker_text(chats)
         keyboard = get_chat_top_picker_keyboard(chats)
     elif callback_data.action == "rating_beer":
         text = await get_top_text(db, user.id)
-        keyboard = get_back_to_rating_keyboard()
+        keyboard = get_back_to_rating_keyboard(callback.message.chat.type == "private")
     elif callback_data.action == "rating_grain":
         text = await get_harvest_rating_text(db, user.id, "зерно")
-        keyboard = get_back_to_rating_keyboard()
+        keyboard = get_back_to_rating_keyboard(callback.message.chat.type == "private")
     elif callback_data.action == "rating_hops":
         text = await get_harvest_rating_text(db, user.id, "хмель")
-        keyboard = get_back_to_rating_keyboard()
+        keyboard = get_back_to_rating_keyboard(callback.message.chat.type == "private")
     elif callback_data.action == "jackpot":
         current_jackpot = await db.get_jackpot()
         text = get_jackpot_text(current_jackpot)
