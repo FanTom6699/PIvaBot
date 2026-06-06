@@ -157,7 +157,7 @@ class UpgradeCallback(CallbackData, prefix="upgrade"):
 
 
 # --- RENDER: DASHBOARD (ВОЗВРАЩЕН ТВОЙ ДИЗАЙН) ---
-async def get_farm_dashboard(user_id: int, user_name: str, db: Database) -> (str, InlineKeyboardMarkup):
+async def get_farm_dashboard(user_id: int, user_name: str, db: Database, show_main_menu: bool = True) -> (str, InlineKeyboardMarkup):
     
     # Данные
     farm = await db.get_user_farm_data(user_id)
@@ -306,7 +306,8 @@ async def get_farm_dashboard(user_id: int, user_name: str, db: Database) -> (str
         InlineKeyboardButton(text="❓ Как играть?", callback_data=FarmCallback(action="show_help", owner_id=user_id).pack())
     ]
     kb += rows(kb_buttons, per_row=2)
-    kb.append([InlineKeyboardButton(text="⬅️ Главное меню", callback_data=FarmCallback(action="main_menu", owner_id=user_id).pack())])
+    if show_main_menu:
+        kb.append([InlineKeyboardButton(text="⬅️ Главное меню", callback_data=FarmCallback(action="main_menu", owner_id=user_id).pack())])
 
     return text, InlineKeyboardMarkup(inline_keyboard=kb)
 
@@ -399,7 +400,12 @@ async def cmd_farm(message: Message, bot: Bot, db: Database):
     user_id = message.from_user.id
     if not await check_user_registered(message, bot, db): return
     try:
-        text, keyboard = await get_farm_dashboard(user_id, message.from_user.full_name, db)
+        text, keyboard = await get_farm_dashboard(
+            user_id,
+            message.from_user.full_name,
+            db,
+            show_main_menu=message.chat.type == "private",
+        )
         await answer_to_trigger(message, text, reply_markup=keyboard)
     except Exception as e:
         logging.error(f"Critical error in cmd_farm: {e}", exc_info=True)
@@ -414,7 +420,12 @@ async def alias_farm(message: Message, bot: Bot, db: Database):
 async def cq_farm_main_dashboard(callback: CallbackQuery, callback_data: FarmCallback, db: Database):
     if not await check_owner(callback, callback_data.owner_id): return
     try:
-        text, keyboard = await get_farm_dashboard(callback.from_user.id, callback.from_user.full_name, db)
+        text, keyboard = await get_farm_dashboard(
+            callback.from_user.id,
+            callback.from_user.full_name,
+            db,
+            show_main_menu=callback.message.chat.type == "private",
+        )
         with suppress(TelegramBadRequest):
             await callback.message.edit_text(text, reply_markup=keyboard)
     except Exception as e:
@@ -425,6 +436,10 @@ async def cq_farm_main_dashboard(callback: CallbackQuery, callback_data: FarmCal
 @farm_router.callback_query(FarmCallback.filter(F.action == "main_menu"))
 async def cq_farm_main_menu(callback: CallbackQuery, callback_data: FarmCallback):
     if not await check_owner(callback, callback_data.owner_id): return
+    if callback.message.chat.type != "private":
+        await callback.answer("Главное меню открывается в личке с ботом.", show_alert=True)
+        return
+
     text = get_private_start_text(callback.from_user.full_name, False)
     keyboard = get_main_menu_keyboard(callback.from_user.id)
     with suppress(TelegramBadRequest):
