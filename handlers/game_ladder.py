@@ -200,10 +200,13 @@ async def end_ladder_game(bot: Bot, chat_id: int, user: User, game: LadderGameSt
     
     if is_win:
         win_amount = game.current_win if game.current_win > 0 else game.stake
+        completed_level = max(0, min(game.current_level - 1, LADDER_LEVELS))
+        is_full_clear = game.current_level > LADDER_LEVELS
+        title = "🎉 <b>Победа в Лесенке!</b> 🎉" if is_full_clear else "💰 <b>Выигрыш забран</b>"
         await db.change_rating(game.player_id, win_amount)
         text = (
-            "🎉 <b>Победа в Лесенке!</b> 🎉\n\n"
-            f"{LADDER_LEVEL_LINES[LADDER_LEVELS]}\n\n"
+            f"{title}\n\n"
+            f"{LADDER_LEVEL_LINES[completed_level]}\n\n"
             f"Игрок: <b>{player_name}</b>\n"
             f"Забрал выигрыш: <b>+{win_amount} 🍺</b>"
         )
