@@ -83,6 +83,76 @@ def get_roulette_cancel_text(reason: str) -> str:
         "Все ставки возвращены."
     )
 
+
+def get_roulette_winner_text(winner_name: str, prize: int) -> str:
+    templates = [
+        (
+            "🏆 <b>Бар признал победителя</b>\n\n"
+            "<b>{name}</b> остался последним у стойки.\n\n"
+            f"{DIVIDER}\n"
+            "Банк забран: <b>+{prize}</b> 🍺"
+        ),
+        (
+            "🍺 <b>Последняя кружка его</b>\n\n"
+            "<b>{name}</b> пережил все раунды и забрал банк.\n\n"
+            f"{DIVIDER}\n"
+            "Выигрыш: <b>+{prize}</b> 🍺"
+        ),
+        (
+            "🎰 <b>Барабан остановился</b>\n\n"
+            "<b>{name}</b> выходит победителем пивной рулетки.\n\n"
+            f"{DIVIDER}\n"
+            "Забрано со стола: <b>+{prize}</b> 🍺"
+        ),
+        (
+            "👑 <b>Король стойки</b>\n\n"
+            "<b>{name}</b> забирает весь банк и спокойно допивает кружку.\n\n"
+            f"{DIVIDER}\n"
+            "Награда: <b>+{prize}</b> 🍺"
+        ),
+        (
+            "🔥 <b>Все ставки сгорели</b>\n\n"
+            "А <b>{name}</b> вышел сухим из пены.\n\n"
+            f"{DIVIDER}\n"
+            "Добыча: <b>+{prize}</b> 🍺"
+        ),
+        (
+            "🍻 <b>Стойка опустела</b>\n\n"
+            "<b>{name}</b> остался один и забрал все кружки.\n\n"
+            f"{DIVIDER}\n"
+            "Банк: <b>+{prize}</b> 🍺"
+        ),
+        (
+            "💰 <b>Касса звякнула</b>\n\n"
+            "<b>{name}</b> уносит общий банк.\n\n"
+            f"{DIVIDER}\n"
+            "Получено: <b>+{prize}</b> 🍺"
+        ),
+        (
+            "🎲 <b>Удача села рядом</b>\n\n"
+            "<b>{name}</b> пережил барабан и забрал куш.\n\n"
+            f"{DIVIDER}\n"
+            "Куш: <b>+{prize}</b> 🍺"
+        ),
+        (
+            "🪑 <b>Последний стул занят</b>\n\n"
+            "<b>{name}</b> досидел до конца и забрал награду.\n\n"
+            f"{DIVIDER}\n"
+            "Награда: <b>+{prize}</b> 🍺"
+        ),
+        (
+            "⚡ <b>Финальный глоток</b>\n\n"
+            "<b>{name}</b> выдержал рулетку до последнего.\n\n"
+            f"{DIVIDER}\n"
+            "Приз: <b>+{prize}</b> 🍺"
+        ),
+    ]
+    return (
+        random.choice(templates).format(name=winner_name, prize=prize)
+        + "\n\n<i>Пивная рулетка закрыта до следующего раунда.</i>"
+    )
+
+
 @roulette_router.message(Command("roulette"))
 async def cmd_roulette(message: Message, bot: Bot, db: Database, settings: SettingsManager):
     if message.chat.type == 'private':
@@ -256,13 +326,7 @@ async def start_roulette_game(chat_id: int, bot: Bot, db: Database):
     winner = players_in_game[0]
     prize = game.stake * len(game.players)
     await db.change_rating(winner.id, prize)
-    winner_text = (
-        f"🏆 <b>Победа в рулетке</b>\n\n"
-        f"<b>{escape(winner.full_name)}</b> остался последним у стойки.\n\n"
-        f"{DIVIDER}\n"
-        f"Банк забран: <b>+{prize}</b> 🍺\n\n"
-        f"<i>Пивная рулетка закрыта до следующего раунда.</i>"
-    )
+    winner_text = get_roulette_winner_text(escape(winner.full_name), prize)
     winner_message = await bot.send_message(chat_id, text=winner_text, parse_mode='HTML')
     with suppress(TelegramBadRequest):
         await bot.pin_chat_message(chat_id=chat_id, message_id=winner_message.message_id, disable_notification=True)
