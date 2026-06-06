@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PIvaBot - справочник команд</title>
+  <style>
+    :root {
+      --bg: #101216;
+      --panel: #181b21;
+      --panel-2: #20242c;
+      --text: #f4efe6;
+      --muted: #b9afa0;
+      --line: #343944;
+      --gold: #f5b84b;
+      --green: #7ac66a;
+      --red: #e06b65;
+      --blue: #70a7ff;
+      --radius: 8px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(245, 184, 75, 0.13), transparent 28rem),
+        linear-gradient(180deg, #101216 0%, #15181d 45%, #111319 100%);
+      font: 16px/1.55 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    a { color: inherit; }
+
+    .layout {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 56px;
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 18px;
+      align-items: end;
+      padding: 18px 0 22px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    h1, h2, h3, p { margin: 0; }
+
+    h1 {
+      font-size: clamp(28px, 4vw, 46px);
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      max-width: 720px;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 17px;
+    }
+
+    .brand-mark {
+      width: 92px;
+      aspect-ratio: 1;
+      display: grid;
+      place-items: center;
+      border: 1px solid #4b3a1d;
+      border-radius: 50%;
+      background: linear-gradient(145deg, #2c2116, #15181d);
+      box-shadow: inset 0 0 0 5px rgba(245, 184, 75, 0.08);
+      font-size: 44px;
+    }
+
+    .tools {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      margin: 22px 0;
+    }
+
+    .search {
+      width: 100%;
+      min-height: 46px;
+      padding: 0 14px;
+      color: var(--text);
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      outline: none;
+    }
+
+    .search:focus { border-color: var(--gold); }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 34px;
+      padding: 0 10px;
+      color: var(--text);
+      text-decoration: none;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.03);
+      white-space: nowrap;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    section {
+      padding-top: 26px;
+      scroll-margin-top: 16px;
+    }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: end;
+      margin-bottom: 12px;
+    }
+
+    .section-head h2 {
+      font-size: 24px;
+      line-height: 1.2;
+    }
+
+    .section-note {
+      color: var(--muted);
+      font-size: 14px;
+      text-align: right;
+    }
+
+    .card {
+      min-height: 152px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, var(--panel) 0%, rgba(24, 27, 33, 0.82) 100%);
+    }
+
+    .card h3 {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin-bottom: 10px;
+      font-size: 18px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      padding: 0 8px;
+      margin: 4px 5px 0 0;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--panel-2);
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 13px;
+    }
+
+    .desc { color: var(--muted); }
+
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .meta-item {
+      padding: 10px;
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    .meta-item b { color: var(--gold); }
+
+    .wide { grid-column: span 2; }
+
+    .full { grid-column: 1 / -1; }
+
+    .callout {
+      padding: 16px;
+      border: 1px solid rgba(245, 184, 75, 0.35);
+      border-radius: var(--radius);
+      background: rgba(245, 184, 75, 0.08);
+    }
+
+    .list {
+      display: grid;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .list-row {
+      display: grid;
+      grid-template-columns: 190px 1fr;
+      gap: 14px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .command {
+      color: var(--gold);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-weight: 700;
+    }
+
+    .hidden { display: none !important; }
+
+    footer {
+      margin-top: 32px;
+      padding-top: 20px;
+      color: var(--muted);
+      border-top: 1px solid var(--line);
+    }
+
+    @media (max-width: 860px) {
+      .grid { grid-template-columns: 1fr; }
+      .wide { grid-column: auto; }
+      .tools { grid-template-columns: 1fr; }
+      .section-head {
+        display: block;
+      }
+      .section-note {
+        margin-top: 4px;
+        text-align: left;
+      }
+      .list-row { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 560px) {
+      .layout {
+        width: min(100% - 20px, 1180px);
+        padding-top: 16px;
+      }
+      .topbar {
+        grid-template-columns: 1fr;
+      }
+      .brand-mark {
+        width: 70px;
+        font-size: 34px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="layout">
+    <header class="topbar">
+      <div>
+        <h1>PIvaBot: команды и правила</h1>
+        <p class="lead">Короткий справочник для игроков: что писать в группе, что открывать в личке, как работают пиво, ферма, рейтинги, джекпот и мини-игры.</p>
+      </div>
+      <div class="brand-mark" aria-label="PIvaBot">🍺</div>
+    </header>
+
+    <div class="tools">
+      <input class="search" id="search" type="search" placeholder="Найти команду, механику или фразу: ферма, рейтинг пиво, рулетка...">
+      <nav class="pill-row" aria-label="Разделы">
+        <a class="pill" href="#commands">⌘ Команды</a>
+        <a class="pill" href="#phrases">💬 Фразы</a>
+        <a class="pill" href="#farm">🌾 Ферма</a>
+        <a class="pill" href="#games">🎲 Игры</a>
+      </nav>
+    </div>
+
+    <section id="commands">
+      <div class="section-head">
+        <h2>Основные команды</h2>
+        <p class="section-note">В группе бот отвечает реплаем на сообщение игрока.</p>
+      </div>
+      <div class="grid">
+        <article class="card searchable">
+          <h3>🍺 /beer</h3>
+          <p class="desc">Выпить пиво и испытать удачу. Может дать плюс к рейтингу, минус или небольшой бонус, если рейтинг был нулевой.</p>
+          <span class="tag">/beer</span><span class="tag">пиво</span><span class="tag">выпить пиво</span>
+        </article>
+        <article class="card searchable">
+          <h3>👤 /me</h3>
+          <p class="desc">Показывает краткий профиль в группе и полный профиль в личке: статус, место, дату регистрации.</p>
+          <span class="tag">/me</span><span class="tag">/profile</span><span class="tag">профиль</span>
+        </article>
+        <article class="card searchable">
+          <h3>🌾 /farm</h3>
+          <p class="desc">Открывает ферму, поле, пивоварню, склад, заказы, магазин и улучшения.</p>
+          <span class="tag">/farm</span><span class="tag">ферма</span><span class="tag">поле</span>
+        </article>
+        <article class="card searchable">
+          <h3>🏆 /top</h3>
+          <p class="desc">В группе показывает топ пива текущего чата. В личке дает выбрать чат, где есть бот и игрок.</p>
+          <span class="tag">/top</span><span class="tag">топ</span><span class="tag">топ чата</span>
+        </article>
+        <article class="card searchable">
+          <h3>🌐 /rating</h3>
+          <p class="desc">Открывает глобальный рейтинг: пиво, зерно и хмель. Работает и в личке, и в группе.</p>
+          <span class="tag">/rating</span><span class="tag">рейтинг</span><span class="tag">рейт глоб</span>
+        </article>
+        <article class="card searchable">
+          <h3>🎁 /jackpot</h3>
+          <p class="desc">Показывает общий банк удачи. В него попадает пиво, потерянное игроками при минусе в /beer.</p>
+          <span class="tag">/jackpot</span><span class="tag">джекпот</span><span class="tag">банк пива</span>
+        </article>
+      </div>
+    </section>
+
+    <section id="phrases">
+      <div class="section-head">
+        <h2>Фразы без слэша</h2>
+        <p class="section-note">Работают в группе, если у бота выключен Privacy Mode.</p>
+      </div>
+      <div class="list">
+        <div class="list-row searchable">
+          <div class="command">пиво</div>
+          <div>Запускает выпить пиво. Также: <span class="tag">выпить пиво</span><span class="tag">пивко</span><span class="tag">налей пиво</span></div>
+        </div>
+        <div class="list-row searchable">
+          <div class="command">ферма</div>
+          <div>Открывает ферму. Также: <span class="tag">поле</span><span class="tag">огород</span><span class="tag">моя ферма</span></div>
+        </div>
+        <div class="list-row searchable">
+          <div class="command">рейтинг</div>
+          <div>Открывает меню глобального рейтинга. Также: <span class="tag">рейт глоб</span><span class="tag">глобальный рейтинг</span><span class="tag">рейтинг глобальный</span></div>
+        </div>
+        <div class="list-row searchable">
+          <div class="command">рейтинг пиво</div>
+          <div>Сразу показывает глобальный рейтинг по текущему количеству 🍺.</div>
+        </div>
+        <div class="list-row searchable">
+          <div class="command">рейтинг зерно</div>
+          <div>Сразу показывает рейтинг по собранному за все время 🌾 зерну.</div>
+        </div>
+        <div class="list-row searchable">
+          <div class="command">рейтинг хмель</div>
+          <div>Сразу показывает рейтинг по собранному за все время 🌱 хмелю.</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="farm">
+      <div class="section-head">
+        <h2>Ферма и производство</h2>
+        <p class="section-note">Ферма открывается кнопками и командой.</p>
+      </div>
+      <div class="grid">
+        <article class="card searchable">
+          <h3>🌾 Поле</h3>
+          <p class="desc">На грядках сажаются семена зерна и хмеля. Когда урожай готов, появляется кнопка сбора.</p>
+        </article>
+        <article class="card searchable">
+          <h3>🏭 Пивоварня</h3>
+          <p class="desc">Тратит зерно и хмель, запускает варку и после таймера выдает пиво в рейтинг.</p>
+        </article>
+        <article class="card searchable">
+          <h3>📦 Склад</h3>
+          <p class="desc">Показывает семена и собранные ресурсы: зерно, хмель и другие предметы фермы.</p>
+        </article>
+        <article class="card searchable">
+          <h3>📋 Доска заказов</h3>
+          <p class="desc">Задания на сдачу ресурсов. За выполнение можно получить пиво или полезные предметы.</p>
+        </article>
+        <article class="card searchable">
+          <h3>⭐ Улучшения</h3>
+          <p class="desc">Поле дает больше возможностей для посадки, пивоварня усиливает производство. Перед улучшением объект должен быть свободен.</p>
+        </article>
+        <article class="card searchable">
+          <h3>🏪 Магазин</h3>
+          <p class="desc">Покупка семян за пиво. Лимиты помогают не превращать экономику в бесконечный круг.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="games">
+      <div class="section-head">
+        <h2>Мини-игры</h2>
+        <p class="section-note">Запускаются командами в группе.</p>
+      </div>
+      <div class="grid">
+        <article class="card wide searchable">
+          <h3>🎰 Пивная рулетка</h3>
+          <p class="desc">Игрок создает лобби, участники входят кнопкой, ставка списывается сразу. После старта бот по очереди выводит игроков, а победитель забирает банк.</p>
+          <div class="meta">
+            <div class="meta-item"><b>Команда</b><br><span class="tag">/roulette 10 4</span></div>
+            <div class="meta-item"><b>Формат</b><br>ставка и максимум игроков</div>
+          </div>
+        </article>
+        <article class="card searchable">
+          <h3>🪜 Пивная лесенка</h3>
+          <p class="desc">Игрок ставит пиво и поднимается по ступеням. Можно забрать выигрыш раньше или рискнуть ради следующей суммы.</p>
+          <span class="tag">/ladder 10</span>
+        </article>
+      </div>
+    </section>
+
+    <section id="notes">
+      <div class="section-head">
+        <h2>Где что работает</h2>
+      </div>
+      <div class="grid">
+        <article class="card searchable">
+          <h3>💬 В группе</h3>
+          <p class="desc">Команды отвечают реплаем. Кнопок назад в личное меню нет, остаются только внутренние кнопки открытого раздела.</p>
+        </article>
+        <article class="card searchable">
+          <h3>📨 В личке</h3>
+          <p class="desc">Открывается главное меню бота: выпить, профиль, рейтинг, ферма, джекпот и помощь.</p>
+        </article>
+        <article class="card searchable">
+          <h3>🔒 Privacy Mode</h3>
+          <p class="desc">Чтобы бот видел фразы без слэша в группе, у него должен быть выключен Privacy Mode в BotFather.</p>
+        </article>
+      </div>
+      <div class="callout full" style="margin-top: 14px;">
+        Справочник можно обновлять вместе с ботом: добавили новую команду - добавили новый блок на этой странице.
+      </div>
+    </section>
+
+    <footer>
+      PIvaBot documentation. Последнее обновление: 2026-06-06.
+    </footer>
+  </main>
+
+  <script>
+    const input = document.querySelector("#search");
+    const items = [...document.querySelectorAll(".searchable")];
+
+    input.addEventListener("input", () => {
+      const query = input.value.trim().toLowerCase();
+      for (const item of items) {
+        item.classList.toggle("hidden", query && !item.innerText.toLowerCase().includes(query));
+      }
+    });
+  </script>
+</body>
+</html>
