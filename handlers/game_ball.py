@@ -43,9 +43,6 @@ def parse_ball_stake(text: str | None) -> int | None:
 
 class BallBetFilter(Filter):
     async def __call__(self, message: Message) -> bool | dict:
-        if message.chat.type == "private":
-            return False
-
         stake = parse_ball_stake(message.text)
         if stake is None:
             return False
@@ -63,17 +60,9 @@ def ball_example() -> str:
 
 @ball_router.message(Command("ball"))
 async def cmd_ball_command(message: Message, bot: Bot, db: Database):
-    if message.chat.type == "private":
-        await message.answer(
-            f"{BALL_EMOJI} \u0418\u0433\u0440\u0430 \u0440\u0430\u0431\u043e\u0442\u0430\u0435\u0442 \u0432 \u0433\u0440\u0443\u043f\u043f\u0435.\n"
-            f"\u041f\u0440\u0438\u043c\u0435\u0440: {ball_example()}",
-            parse_mode="HTML",
-        )
-        return
-
     stake = parse_ball_stake(message.text)
     if stake is None:
-        await message.reply(
+        await message.answer(
             (
                 f"{BALL_EMOJI} <b>\u041f\u0438\u0432\u043d\u043e\u0439 \u0431\u0440\u043e\u0441\u043e\u043a</b>\n\n"
                 f"\u041d\u0430\u043f\u0438\u0448\u0438: {ball_example()}"
@@ -91,10 +80,12 @@ async def cmd_ball_text(message: Message, bot: Bot, db: Database, stake: int):
 
 
 async def play_ball(message: Message, bot: Bot, db: Database, stake: int):
-    if not await check_user_registered(message, bot, db):
+    user = message.from_user
+    if message.chat.type == "private":
+        await db.add_user(user.id, user.first_name, user.last_name, user.username)
+    elif not await check_user_registered(message, bot, db):
         return
 
-    user = message.from_user
     balance = await db.get_user_beer_rating(user.id)
 
     if not (BALL_MIN_BET <= stake <= BALL_MAX_BET):
