@@ -14,7 +14,7 @@ from utils import answer_to_trigger, format_time_delta, mention_user, mention_us
 
 common_router = Router()
 DIVIDER = "<code>--- --- ---</code>"
-GUIDE_URL = "http://pivnoybaron.uz"
+GUIDE_URL = "https://pivnoybaron.uz"
 
 
 class MainMenuCallback(CallbackData, prefix="menu"):
