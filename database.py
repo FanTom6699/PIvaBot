@@ -654,11 +654,6 @@ class Database:
                 "UPDATE user_farm_data SET brewery_batch_size = ?, brewery_batch_timer_end = ? WHERE user_id = ?",
                 (batch_size, end_time.isoformat(), user_id)
             )
-            # Добавляем уведомление
-            await db.execute(
-                "INSERT INTO farm_notifications (user_id, task_type, data_json) VALUES (?, ?, ?)",
-                (user_id, 'batch', str(batch_size))
-            )
             await db.commit()
 
     async def collect_brewery(self, user_id: int, reward_amount: int):
@@ -809,15 +804,7 @@ class Database:
             )
             brewery_tasks = await cursor_brewery.fetchall()
             
-            cursor_batch = await db.execute(
-                "SELECT T1.user_id, T1.task_type, T2.brewery_batch_size FROM farm_notifications T1 "
-                "JOIN user_farm_data T2 ON T1.user_id = T2.user_id "
-                "WHERE T1.task_type = 'batch' AND T1.is_sent = 0 AND T2.brewery_batch_timer_end <= ?",
-                (now.isoformat(),)
-            )
-            batch_tasks = await cursor_batch.fetchall()
-            
-            all_tasks = field_tasks + brewery_tasks + batch_tasks
+            all_tasks = field_tasks + brewery_tasks
             
             return [(uid, ttype, int(data)) for uid, ttype, data in all_tasks if data is not None]
 

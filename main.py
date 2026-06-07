@@ -31,15 +31,6 @@ if not BOT_TOKEN:
 # Фоновая задача фермы
 # ─────────────────────────────────────────────
 def format_farm_notification(task_type: str, data: int | None) -> str | None:
-    if task_type == "batch":
-        batch_text = f"Партия: <b>x{data}</b>\n" if data and 0 < data < 1000 else ""
-        return (
-            "🏭 <b>Пивоварня</b>\n\n"
-            "Твоя варка готова к сбору.\n\n"
-            f"{batch_text}"
-            "Зайди на ферму и забери награду."
-        )
-
     if task_type == "field_upgrade":
         level_text = f"\nНовый уровень: <b>{data}</b>" if data and 0 < data < 100 else ""
         return f"🌾 <b>Поле</b>\n\nУлучшение завершено.{level_text}"
