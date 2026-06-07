@@ -1,0 +1,588 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PIvaBot - справочник игрока</title>
+  <meta name="description" content="Команды, рейтинги, ферма, джекпот и мини-игры PIvaBot.">
+  <style>
+    :root {
+      --bg: #0f1014;
+      --paper: #17191f;
+      --paper-2: #20232b;
+      --line: #323744;
+      --text: #f7f0e6;
+      --muted: #b7ab9a;
+      --gold: #f4b84a;
+      --amber: #d8892e;
+      --green: #82c766;
+      --blue: #7aa7ff;
+      --red: #e36f67;
+      --shadow: 0 18px 60px rgba(0, 0, 0, .32);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 18% 8%, rgba(244, 184, 74, .18), transparent 30rem),
+        radial-gradient(circle at 90% 10%, rgba(122, 167, 255, .10), transparent 24rem),
+        linear-gradient(180deg, #0f1014 0%, #14161b 48%, #0f1014 100%);
+      font: 16px/1.55 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    a { color: inherit; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+    .wrap {
+      width: min(1160px, calc(100% - 28px));
+      margin: 0 auto;
+    }
+
+    .hero {
+      min-height: 92vh;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      padding: 22px 0 34px;
+    }
+
+    .nav {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: center;
+      padding: 12px 0;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 800;
+      letter-spacing: 0;
+    }
+
+    .brand-icon {
+      width: 42px;
+      aspect-ratio: 1;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: linear-gradient(145deg, #352516, #1b1d24);
+      border: 1px solid #5b431e;
+      box-shadow: inset 0 0 0 3px rgba(244, 184, 74, .08);
+      font-size: 24px;
+    }
+
+    .nav-links {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 34px;
+      padding: 0 12px;
+      text-decoration: none;
+      color: var(--muted);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, .03);
+    }
+
+    .chip:hover { color: var(--text); border-color: #5b6474; }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(320px, .9fr);
+      gap: 28px;
+      align-items: center;
+      padding: 42px 0 14px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--gold);
+      font-weight: 700;
+      margin-bottom: 14px;
+    }
+
+    h1, h2, h3, p { margin: 0; }
+
+    h1 {
+      max-width: 780px;
+      font-size: clamp(40px, 7vw, 84px);
+      line-height: .96;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      max-width: 640px;
+      margin-top: 18px;
+      color: var(--muted);
+      font-size: clamp(17px, 2vw, 21px);
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 26px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      padding: 0 16px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 750;
+      border: 1px solid var(--line);
+      background: var(--paper-2);
+    }
+
+    .btn-primary {
+      background: linear-gradient(180deg, #f5bf5b, #d98a2c);
+      color: #1b1207;
+      border-color: #ffc86a;
+    }
+
+    .scene {
+      position: relative;
+      min-height: 440px;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid #403723;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.05), transparent),
+        radial-gradient(circle at 50% 18%, rgba(244, 184, 74, .28), transparent 12rem),
+        linear-gradient(145deg, #1b1510, #161922);
+      box-shadow: var(--shadow);
+    }
+
+    .bar-shelf {
+      position: absolute;
+      left: 9%;
+      right: 9%;
+      height: 8px;
+      border-radius: 999px;
+      background: #4a2c16;
+      box-shadow: 0 92px 0 #4a2c16, 0 184px 0 #4a2c16;
+      top: 84px;
+    }
+
+    .mug {
+      position: absolute;
+      left: 50%;
+      bottom: 64px;
+      width: 180px;
+      height: 210px;
+      transform: translateX(-50%);
+      border: 10px solid #f0c167;
+      border-radius: 16px 16px 28px 28px;
+      background: linear-gradient(90deg, #d98b22 0%, #f4b84a 48%, #c7771d 100%);
+      box-shadow: inset 18px 0 rgba(255,255,255,.18), inset -14px 0 rgba(70,37,10,.18);
+    }
+
+    .mug::before {
+      content: "";
+      position: absolute;
+      left: -12px;
+      right: -12px;
+      top: -45px;
+      height: 58px;
+      border-radius: 22px;
+      background:
+        radial-gradient(circle at 20% 50%, #fff7df 0 22px, transparent 23px),
+        radial-gradient(circle at 46% 35%, #fff1c7 0 28px, transparent 29px),
+        radial-gradient(circle at 72% 55%, #fff8e7 0 24px, transparent 25px),
+        #f8e8bf;
+    }
+
+    .mug::after {
+      content: "";
+      position: absolute;
+      right: -74px;
+      top: 42px;
+      width: 68px;
+      height: 92px;
+      border: 12px solid #f0c167;
+      border-left: 0;
+      border-radius: 0 46px 46px 0;
+    }
+
+    .coin, .hop {
+      position: absolute;
+      display: grid;
+      place-items: center;
+      width: 54px;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.14);
+      font-size: 27px;
+    }
+
+    .coin:nth-child(3) { left: 12%; top: 38px; }
+    .coin:nth-child(4) { right: 14%; top: 134px; }
+    .coin:nth-child(5) { left: 16%; bottom: 70px; }
+    .hop { right: 12%; bottom: 42px; }
+
+    .search-panel {
+      margin-top: -24px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(23, 25, 31, .88);
+      backdrop-filter: blur(10px);
+      box-shadow: var(--shadow);
+    }
+
+    .search {
+      width: 100%;
+      min-height: 48px;
+      padding: 0 14px;
+      color: var(--text);
+      background: #111319;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      outline: none;
+    }
+
+    .search:focus { border-color: var(--gold); }
+
+    section {
+      padding: 48px 0 4px;
+      scroll-margin-top: 18px;
+    }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: 18px;
+      margin-bottom: 18px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 14px;
+    }
+
+    h2 {
+      font-size: clamp(28px, 4vw, 44px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+
+    .section-note {
+      max-width: 420px;
+      color: var(--muted);
+      text-align: right;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .card {
+      min-height: 172px;
+      padding: 16px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.045), transparent),
+        var(--paper);
+    }
+
+    .card h3 {
+      display: flex;
+      gap: 9px;
+      align-items: center;
+      margin-bottom: 10px;
+      font-size: 20px;
+      line-height: 1.2;
+    }
+
+    .desc { color: var(--muted); }
+
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 13px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 8px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--paper-2);
+      color: var(--text);
+      font: 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .wide { grid-column: span 2; }
+
+    .list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 210px minmax(0, 1fr);
+      gap: 14px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255,255,255,.035);
+    }
+
+    .cmd {
+      color: var(--gold);
+      font-weight: 800;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .steps {
+      counter-reset: step;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .step {
+      counter-increment: step;
+      padding: 16px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: var(--paper);
+    }
+
+    .step::before {
+      content: counter(step);
+      display: grid;
+      place-items: center;
+      width: 30px;
+      aspect-ratio: 1;
+      margin-bottom: 12px;
+      border-radius: 50%;
+      color: #201408;
+      background: var(--gold);
+      font-weight: 900;
+    }
+
+    footer {
+      margin-top: 50px;
+      padding: 22px 0 36px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+    }
+
+    .hidden { display: none !important; }
+
+    @media (max-width: 920px) {
+      .hero { min-height: auto; }
+      .hero-grid, .grid, .steps { grid-template-columns: 1fr; }
+      .scene { min-height: 340px; }
+      .section-head { display: block; }
+      .section-note { margin-top: 8px; text-align: left; }
+      .wide { grid-column: auto; }
+      .row { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 600px) {
+      .wrap { width: min(100% - 20px, 1160px); }
+      .nav { align-items: flex-start; }
+      .nav-links { display: none; }
+      .hero-grid { padding-top: 24px; }
+      .scene { min-height: 300px; }
+      .mug {
+        width: 138px;
+        height: 166px;
+        bottom: 52px;
+      }
+      .mug::after {
+        right: -58px;
+        width: 54px;
+        height: 74px;
+      }
+      .coin, .hop {
+        width: 44px;
+        font-size: 22px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="wrap">
+      <nav class="nav">
+        <div class="brand"><span class="brand-icon">🍺</span><span>PIvaBot</span></div>
+        <div class="nav-links">
+          <a class="chip" href="#commands">Команды</a>
+          <a class="chip" href="#phrases">Фразы</a>
+          <a class="chip" href="#farm">Ферма</a>
+          <a class="chip" href="#games">Игры</a>
+        </div>
+      </nav>
+    </div>
+
+    <div class="wrap hero-grid">
+      <div>
+        <div class="eyebrow">🍻 Игровой бот для Telegram-чатов</div>
+        <h1>Команды и правила PIvaBot</h1>
+        <p class="lead">Пей пиво, копи рейтинг, выращивай зерно и хмель, вари партии, выполняй заказы и соревнуйся с друзьями в чате.</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="#commands">Открыть команды</a>
+          <a class="btn" href="#start">Новичку</a>
+        </div>
+      </div>
+      <div class="scene" aria-label="Пивная кружка PIvaBot">
+        <div class="bar-shelf"></div>
+        <div class="coin">🍺</div>
+        <div class="coin">🌾</div>
+        <div class="coin">🎁</div>
+        <div class="hop">🌱</div>
+        <div class="mug"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="search-panel">
+      <input id="search" class="search" type="search" placeholder="Найти команду или механику: пиво, ферма, рейтинг хмель, рулетка...">
+    </div>
+
+    <section id="commands">
+      <div class="section-head">
+        <h2>Основные команды</h2>
+        <p class="section-note">Команды можно писать через слэш. В группе бот отвечает на сообщение игрока.</p>
+      </div>
+      <div class="grid">
+        <article class="card searchable">
+          <h3>🍺 /beer</h3>
+          <p class="desc">Выпить пиво и испытать удачу. Можно получить плюс, минус или шанс на джекпот.</p>
+          <div class="tags"><span class="tag">/beer</span><span class="tag">пиво</span><span class="tag">выпить пиво</span></div>
+        </article>
+        <article class="card searchable">
+          <h3>👤 /me</h3>
+          <p class="desc">Показывает профиль игрока: статус, место в рейтинге и дату регистрации.</p>
+          <div class="tags"><span class="tag">/me</span><span class="tag">/profile</span><span class="tag">профиль</span></div>
+        </article>
+        <article class="card searchable">
+          <h3>🌾 /farm</h3>
+          <p class="desc">Открывает ферму, поле, пивоварню, склад, магазин, заказы и улучшения.</p>
+          <div class="tags"><span class="tag">/farm</span><span class="tag">ферма</span><span class="tag">поле</span></div>
+        </article>
+        <article class="card searchable">
+          <h3>🏆 /top</h3>
+          <p class="desc">В группе показывает топ пива текущего чата. В личке дает выбрать чат.</p>
+          <div class="tags"><span class="tag">/top</span><span class="tag">топ</span><span class="tag">топ чата</span></div>
+        </article>
+        <article class="card searchable">
+          <h3>🌐 /rating</h3>
+          <p class="desc">Открывает глобальный рейтинг по пиву, зерну и хмелю.</p>
+          <div class="tags"><span class="tag">/rating</span><span class="tag">рейтинг</span><span class="tag">рейт глоб</span></div>
+        </article>
+        <article class="card searchable">
+          <h3>🎁 /jackpot</h3>
+          <p class="desc">Показывает общий банк удачи. Минус из /beer попадает сюда.</p>
+          <div class="tags"><span class="tag">/jackpot</span><span class="tag">джекпот</span><span class="tag">банк пива</span></div>
+        </article>
+      </div>
+    </section>
+
+    <section id="phrases">
+      <div class="section-head">
+        <h2>Фразы без слэша</h2>
+        <p class="section-note">Короткие слова запускают те же действия в группе.</p>
+      </div>
+      <div class="list">
+        <div class="row searchable"><div class="cmd">пиво</div><div>Запускает выпить пиво. Также работают: <span class="tag">выпить пиво</span> <span class="tag">пивко</span> <span class="tag">налей пиво</span></div></div>
+        <div class="row searchable"><div class="cmd">ферма</div><div>Открывает ферму. Также: <span class="tag">моя ферма</span> <span class="tag">поле</span> <span class="tag">огород</span></div></div>
+        <div class="row searchable"><div class="cmd">рейтинг</div><div>Открывает меню глобального рейтинга. Также: <span class="tag">рейт глоб</span> <span class="tag">глобальный рейтинг</span></div></div>
+        <div class="row searchable"><div class="cmd">рейтинг пиво</div><div>Сразу показывает глобальный рейтинг по текущему количеству 🍺.</div></div>
+        <div class="row searchable"><div class="cmd">рейтинг зерно</div><div>Сразу показывает рейтинг по собранному за все время 🌾 зерну.</div></div>
+        <div class="row searchable"><div class="cmd">рейтинг хмель</div><div>Сразу показывает рейтинг по собранному за все время 🌱 хмелю.</div></div>
+      </div>
+    </section>
+
+    <section id="farm">
+      <div class="section-head">
+        <h2>Ферма</h2>
+        <p class="section-note">Ферма превращает ресурсы в пиво и дает постоянное развитие.</p>
+      </div>
+      <div class="grid">
+        <article class="card searchable"><h3>🌾 Поле</h3><p class="desc">Сажай семена зерна и хмеля. Когда урожай готов, появляется кнопка сбора.</p></article>
+        <article class="card searchable"><h3>🏭 Пивоварня</h3><p class="desc">Тратит зерно и хмель, запускает варку и после таймера выдает 🍺 рейтинг.</p></article>
+        <article class="card searchable"><h3>📦 Склад</h3><p class="desc">Хранит семена и собранные ресурсы.</p></article>
+        <article class="card searchable"><h3>📋 Заказы</h3><p class="desc">Сдавай ресурсы и получай награды: пиво, предметы или новые ресурсы.</p></article>
+        <article class="card searchable"><h3>⭐ Улучшения</h3><p class="desc">Улучшают поле и пивоварню. Перед улучшением объект должен быть свободен.</p></article>
+        <article class="card searchable"><h3>🏪 Магазин</h3><p class="desc">Покупка семян за пиво. Лимиты помогают держать экономику живой.</p></article>
+      </div>
+    </section>
+
+    <section id="games">
+      <div class="section-head">
+        <h2>Мини-игры</h2>
+        <p class="section-note">Игры запускаются командами в группе и используют 🍺 как ставку.</p>
+      </div>
+      <div class="grid">
+        <article class="card wide searchable">
+          <h3>🎰 Пивная рулетка</h3>
+          <p class="desc">Создатель открывает лобби, игроки входят кнопкой, ставка списывается сразу. После старта участники вылетают по очереди, а победитель забирает банк.</p>
+          <div class="tags"><span class="tag">/roulette 10 4</span></div>
+        </article>
+        <article class="card searchable">
+          <h3>🪜 Пивная лесенка</h3>
+          <p class="desc">Игрок ставит пиво, поднимается по ступеням и решает: забрать выигрыш или рискнуть ради большей суммы.</p>
+          <div class="tags"><span class="tag">/ladder 10</span></div>
+        </article>
+      </div>
+    </section>
+
+    <section id="start">
+      <div class="section-head">
+        <h2>Новичку</h2>
+        <p class="section-note">Самый короткий путь, чтобы начать играть.</p>
+      </div>
+      <div class="steps">
+        <div class="step searchable"><b>/start</b><br><span class="desc">Напиши боту в личку и зарегистрируйся.</span></div>
+        <div class="step searchable"><b>пиво</b><br><span class="desc">Напиши в группе и получи первые 🍺.</span></div>
+        <div class="step searchable"><b>ферма</b><br><span class="desc">Выращивай 🌾 зерно и 🌱 хмель.</span></div>
+        <div class="step searchable"><b>рейтинг</b><br><span class="desc">Смотри места игроков и соревнуйся.</span></div>
+      </div>
+    </section>
+
+    <footer>
+      PIvaBot. Справочник игрока. Обновлено 07.06.2026.
+    </footer>
+  </main>
+
+  <script>
+    const input = document.querySelector("#search");
+    const cards = [...document.querySelectorAll(".searchable")];
+
+    input.addEventListener("input", () => {
+      const query = input.value.trim().toLowerCase();
+      cards.forEach((card) => {
+        card.classList.toggle("hidden", Boolean(query) && !card.innerText.toLowerCase().includes(query));
+      });
+    });
+  </script>
+</body>
+</html>
