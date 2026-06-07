@@ -60,7 +60,6 @@ async def setup_bot_commands(bot: Bot):
         BotCommand(command="top", description="🏆 Топ пива в чате"),
         BotCommand(command="rating", description="🌐 Глобальный рейтинг"),
         BotCommand(command="jackpot", description="🎁 Общий банк удачи"),
-        BotCommand(command="guide", description="📘 Справочник команд"),
         BotCommand(command="help", description="❓ Помощь и правила"),
     ])
 
