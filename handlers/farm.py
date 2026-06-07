@@ -510,7 +510,7 @@ async def cq_farm_orders_menu(callback: CallbackQuery, db: Database, callback_da
         text = (
             "📋 <b>Доска заказов</b>\n\n"
             "Бармен оставил поручения на сегодня.\n"
-            "Заказы обновляются раз в 24 часа.\n\n"
+            "Заказы обновляются раз в 24 часа и подбираются под дневной запас магазина.\n\n"
             f"{DIVIDER}\n"
         )
         buttons = []

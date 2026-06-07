@@ -110,9 +110,9 @@ FARM_ORDER_POOL = {
         'reward_type': 'beer', 'reward_amount': 25
     },
     'grain_25': {
-        'text': "Поставка к стойке: 25 🌾 Зерна",
-        'items': {'зерно': 25},
-        'reward_type': 'beer', 'reward_amount': 70
+        'text': "Поставка к стойке: 16 🌾 Зерна",
+        'items': {'зерно': 16},
+        'reward_type': 'beer', 'reward_amount': 46
     },
     'hops_6': {
         'text': "Ароматная партия: 6 🌱 Хмеля",
@@ -120,9 +120,9 @@ FARM_ORDER_POOL = {
         'reward_type': 'beer', 'reward_amount': 38
     },
     'hops_15': {
-        'text': "Хмельной запас: 15 🌱 Хмеля",
-        'items': {'хмель': 15},
-        'reward_type': 'beer', 'reward_amount': 95
+        'text': "Хмельной запас: 8 🌱 Хмеля",
+        'items': {'хмель': 8},
+        'reward_type': 'beer', 'reward_amount': 54
     },
     'brew_1': {
         'text': "Набор для варки: 5 🌾 + 3 🌱",
@@ -135,9 +135,9 @@ FARM_ORDER_POOL = {
         'reward_type': 'beer', 'reward_amount': 90
     },
     'brew_big': {
-        'text': "Большой вечер: 25 🌾 + 15 🌱",
-        'items': {'зерно': 25, 'хмель': 15},
-        'reward_type': 'beer', 'reward_amount': 240
+        'text': "Большой вечер: 15 🌾 + 9 🌱",
+        'items': {'зерно': 15, 'хмель': 9},
+        'reward_type': 'beer', 'reward_amount': 135
     },
     'starter_grain': {
         'text': "Вернуть семена: 5 семян 🌾",
@@ -151,10 +151,53 @@ FARM_ORDER_POOL = {
     }
 }
 
+ORDER_DAILY_BUDGET = {
+    'зерно': 20,
+    'хмель': 10,
+    'семя_зерна': 10,
+    'семя_хмеля': 5,
+}
+
+
+def _order_fits_budget(order_id: str, used: dict) -> bool:
+    order = FARM_ORDER_POOL[order_id]
+    for item_id, amount in order.get('items', {}).items():
+        if used.get(item_id, 0) + amount > ORDER_DAILY_BUDGET.get(item_id, amount):
+            return False
+    return True
+
+
+def _add_order_to_budget(order_id: str, used: dict):
+    order = FARM_ORDER_POOL[order_id]
+    for item_id, amount in order.get('items', {}).items():
+        used[item_id] = used.get(item_id, 0) + amount
+
+
 def get_random_orders(count=3) -> list:
-    """Возвращает N случайных ID заказов из пула."""
-    all_order_keys = list(FARM_ORDER_POOL.keys())
-    if len(all_order_keys) < count:
-        return all_order_keys 
-    return random.sample(all_order_keys, count)
+    """Возвращает N заказов так, чтобы общий набор не спорил с дневным лимитом магазина."""
+    order_keys = list(FARM_ORDER_POOL.keys())
+    random.shuffle(order_keys)
+
+    selected = []
+    used = {}
+    for order_id in order_keys:
+        if len(selected) >= count:
+            break
+        if _order_fits_budget(order_id, used):
+            selected.append(order_id)
+            _add_order_to_budget(order_id, used)
+
+    if len(selected) < count:
+        easy_orders = sorted(
+            order_keys,
+            key=lambda oid: sum(FARM_ORDER_POOL[oid].get('items', {}).values())
+        )
+        for order_id in easy_orders:
+            if len(selected) >= count:
+                break
+            if order_id not in selected and _order_fits_budget(order_id, used):
+                selected.append(order_id)
+                _add_order_to_budget(order_id, used)
+
+    return selected[:count]
 # --- --- ---
