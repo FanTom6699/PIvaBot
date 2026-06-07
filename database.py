@@ -26,11 +26,16 @@ class Database:
                     last_name TEXT,
                     username TEXT,
                     beer_rating INTEGER DEFAULT 0,
+                    max_beer_rating INTEGER DEFAULT 0,
                     last_beer_time TEXT,
                     created_at TEXT
                 )
             ''')
             await self._ensure_column(db, "users", "created_at", "TEXT")
+            await self._ensure_column(db, "users", "max_beer_rating", "INTEGER DEFAULT 0")
+            await db.execute(
+                "UPDATE users SET max_beer_rating = beer_rating WHERE max_beer_rating < beer_rating"
+            )
             await db.execute(
                 "UPDATE users SET created_at = ? WHERE created_at IS NULL",
                 (datetime.now().isoformat(),)
@@ -273,7 +278,7 @@ class Database:
     async def get_user_profile(self, user_id: int):
         async with aiosqlite.connect(self.db_name) as db:
             cursor = await db.execute(
-                "SELECT first_name, last_name, username, beer_rating, last_beer_time, created_at FROM users WHERE user_id = ?",
+                "SELECT first_name, last_name, username, beer_rating, last_beer_time, created_at, max_beer_rating FROM users WHERE user_id = ?",
                 (user_id,)
             )
             return await cursor.fetchone()
@@ -290,14 +295,19 @@ class Database:
         """Изменяет рейтинг пользователя на amount (может быть отрицательным)."""
         async with aiosqlite.connect(self.db_name) as db:
             # Получаем текущий рейтинг
-            cursor = await db.execute("SELECT beer_rating FROM users WHERE user_id = ?", (user_id,))
+            cursor = await db.execute("SELECT beer_rating, max_beer_rating FROM users WHERE user_id = ?", (user_id,))
             row = await cursor.fetchone()
             current_rating = row[0] if row else 0
+            current_max_rating = row[1] if row and row[1] is not None else current_rating
             
             new_rating = current_rating + amount
             if new_rating < 0: new_rating = 0 # Не уходим в минус
+            new_max_rating = max(current_max_rating, new_rating)
             
-            await db.execute("UPDATE users SET beer_rating = ? WHERE user_id = ?", (new_rating, user_id))
+            await db.execute(
+                "UPDATE users SET beer_rating = ?, max_beer_rating = ? WHERE user_id = ?",
+                (new_rating, new_max_rating, user_id)
+            )
             await db.commit()
             return new_rating
 

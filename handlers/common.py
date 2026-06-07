@@ -198,16 +198,19 @@ async def get_profile_text(user_id: int, user_name: str, db: Database, settings:
     user_name = mention_user(user_id, user_name)
     profile = await db.get_user_profile(user_id)
     rating = profile[3] if profile else 0
+    max_rating = profile[6] if profile and len(profile) > 6 and profile[6] is not None else rating
     registration_date = format_registration_date(profile[5] if profile else None)
     rank = await db.get_user_rank(user_id)
     rank_text = f"#{rank['rank']}" if rank else "—"
+    level, title = get_rating_level(max_rating)
 
     return (
         f"👤 <b>Профиль</b>\n\n"
         f"<b>{user_name}</b>\n"
         f"{DIVIDER}\n"
-        f"Статус: <b>{get_rating_title(rating)}</b>\n"
-        f"Рейтинг: <b>{rating}</b> 🍺\n"
+        f"Уровень: <b>{level}</b> — <b>{title}</b>\n"
+        f"Пиво: <b>{rating}</b> 🍺\n"
+        f"Рекорд: <b>{max_rating}</b> 🍺\n"
         f"Место: <b>{rank_text}</b>\n"
         f"В баре с: <b>{registration_date}</b>"
     )
@@ -217,45 +220,62 @@ async def get_compact_profile_text(user_id: int, user_name: str, db: Database, s
     user_name = mention_user(user_id, user_name)
     profile = await db.get_user_profile(user_id)
     rating = profile[3] if profile else 0
+    max_rating = profile[6] if profile and len(profile) > 6 and profile[6] is not None else rating
     registration_date = format_registration_date(profile[5] if profile else None)
     rank = await db.get_user_rank(user_id)
     rank_text = f"#{rank['rank']}" if rank else "—"
+    level, title = get_rating_level(max_rating)
 
     return (
         f"👤 <b>{user_name}</b>\n\n"
-        f"Статус: <b>{get_rating_title(rating)}</b>\n"
+        f"Ур. <b>{level}</b> — <b>{title}</b>\n"
+        f"Пиво: <b>{rating}</b> 🍺\n"
         f"Место в топе: <b>{rank_text}</b>\n"
         f"В баре с: <b>{registration_date}</b>"
     )
 
 
+RATING_LEVELS = [
+    (0, "🧐 Новичок"),
+    (100, "🍻 Выпивоха"),
+    (300, "🎩 Завсегдатай"),
+    (750, "😎 Свой в доску"),
+    (1500, "💪 Синяк"),
+    (3000, "⭐ V.I.P."),
+    (5000, "🍾 Сомелье"),
+    (7500, "🎗 Ветеран Бара"),
+    (10000, "🌟 Легенда Бара"),
+    (15000, "🎖 Элита"),
+    (20000, "🏆 Чемпион"),
+    (30000, "💎 Алмазный Алконафт"),
+    (40000, "🌀 Повелитель Пены"),
+    (50000, "🌌 Бог Пива"),
+    (65000, "🔱 Атлант"),
+    (80000, "🦄 Мифический"),
+    (100000, "🧙‍♂️ Пивной Магистр"),
+    (150000, "🦖 Пивозавр"),
+    (225000, "🤖 Барный Киборг"),
+    (300000, "🚀 Трижды Несокрушимый"),
+    (400000, "⚡️ Гроза Кранов"),
+    (500000, "🌪️ Лорд Хмельных Бурь"),
+    (650000, "👑 Император Пива"),
+    (800000, "🪐 Хозяин Галактики Пива"),
+    (1000000, "✨ Пивной Абсолют"),
+]
+
+
+def get_rating_level(rating: int) -> tuple[int, str]:
+    level = 1
+    title = RATING_LEVELS[0][1]
+    for index, (threshold, level_title) in enumerate(RATING_LEVELS, start=1):
+        if rating >= threshold:
+            level = index
+            title = level_title
+    return level, title
+
+
 def get_rating_title(rating: int) -> str:
-    status = "🧐 Новичок"
-    if rating >= 100: status = "🍻 Выпивоха"
-    if rating >= 300: status = "🎩 Завсегдатай"
-    if rating >= 750: status = "😎 Свой в доску"
-    if rating >= 1500: status = "💪 Синяк"
-    if rating >= 3000: status = " V.I.P."
-    if rating >= 5000: status = "🍾 Сомелье"
-    if rating >= 7500: status = "🎗 Ветеран Бара"
-    if rating >= 10000: status = "🌟 Легенда Бара"
-    if rating >= 15000: status = "🎖 Элита"
-    if rating >= 20000: status = "🏆 Чемпион"
-    if rating >= 30000: status = "💎 Алмазный Алконафт"
-    if rating >= 40000: status = "🌀 Повелитель Пены"
-    if rating >= 50000: status = "🌌 Бог Пива"
-    if rating >= 65000: status = "🔱 Атлант"
-    if rating >= 80000: status = "🦄 Мифический"
-    if rating >= 100000: status = "🧙‍♂️ Пивной Магистр"
-    if rating >= 150000: status = "🦖 Пивозавр"
-    if rating >= 225000: status = "🤖 Барный Киборг"
-    if rating >= 300000: status = "🚀 Трижды Несокрушимый"
-    if rating >= 400000: status = "⚡️ Гроза Кранов"
-    if rating >= 500000: status = "🌪️ Лорд Хмельных Бурь"
-    if rating >= 650000: status = "👑 Император Пива"
-    if rating >= 800000: status = "🪐 Хозяин Галактики Пива"
-    if rating >= 1000000: status = "✨ Пивной Абсолют"
-    return status
+    return get_rating_level(rating)[1]
 
 
 async def get_top_text(db: Database, user_id: int | None = None) -> str:
