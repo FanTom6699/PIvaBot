@@ -49,7 +49,7 @@ def get_back_to_menu_keyboard() -> InlineKeyboardMarkup:
 
 
 def get_guide_keyboard(show_main_menu: bool = False) -> InlineKeyboardMarkup:
-    rows = [[InlineKeyboardButton(text="📘 Открыть справочник", url=GUIDE_URL)]]
+    rows = [[InlineKeyboardButton(text="📘 Справочник команд", url=GUIDE_URL)]]
     if show_main_menu:
         rows.append([InlineKeyboardButton(text="⬅️ Назад в меню", callback_data=MainMenuCallback(action="home").pack())])
     return InlineKeyboardMarkup(inline_keyboard=rows)
@@ -426,22 +426,9 @@ def get_jackpot_text(current_jackpot: int) -> str:
 def get_help_text() -> str:
     return (
         "📘 <b>Справочник PIvaBot</b>\n\n"
-        "Краткая помощь по боту. Полный список команд, фраз без слэша, ферма, рейтинги и мини-игры лежат на сайте.\n\n"
+        "Полный список команд, фраз без слэша, ферма, рейтинги и мини-игры находятся тут.\n\n"
         f"{DIVIDER}\n"
-        "<b>Быстрый старт:</b>\n"
-        "• <code>/start</code> - открыть личное меню.\n"
-        "• <code>/beer</code> - выпить пиво и получить 🍺.\n"
-        "• <code>/me</code> - посмотреть профиль.\n"
-        "• <code>/farm</code> - открыть ферму и пивоварню.\n"
-        "• <code>/top</code> - топ пива в текущем чате.\n"
-        "• <code>/rating</code> - глобальные рейтинги.\n\n"
-        f"{DIVIDER}\n"
-        "<b>В группе можно писать без слэша:</b>\n"
-        "• <code>пиво</code>, <code>пивко</code>, <code>налей пиво</code>\n"
-        "• <code>ферма</code>, <code>моя ферма</code>\n"
-        "• <code>рейтинг пиво</code>, <code>рейт зерно</code>, <code>рейт хмель</code>\n\n"
-        f"{DIVIDER}\n"
-        "Нажми кнопку ниже, чтобы открыть красивый справочник."
+        "Нажми кнопку ниже, чтобы открыть справочник команд."
     )
 
 
