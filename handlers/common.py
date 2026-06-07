@@ -14,7 +14,7 @@ from utils import answer_to_trigger, format_time_delta, mention_user, mention_us
 
 common_router = Router()
 DIVIDER = "<code>--- --- ---</code>"
-GUIDE_URL = "https://telegra.ph/Komandy-PIvaBot-06-07"
+GUIDE_URL = "http://pivnoybaron.uz"
 
 
 class MainMenuCallback(CallbackData, prefix="menu"):
@@ -425,22 +425,23 @@ def get_jackpot_text(current_jackpot: int) -> str:
 
 def get_help_text() -> str:
     return (
-        "❓ <b>Помощь</b>\n\n"
-        "Карта бара и основные команды.\n\n"
+        "📘 <b>Справочник PIvaBot</b>\n\n"
+        "Краткая помощь по боту. Полный список команд, фраз без слэша, ферма, рейтинги и мини-игры лежат на сайте.\n\n"
         f"{DIVIDER}\n"
-        "<b>Основное:</b>\n"
-        "• <code>/start</code> - Зарегистрироваться или проверить свой профиль.\n"
-        "• <code>/beer</code> - Испытать удачу (раз в 2 часа).\n"
-        "• <code>/top</code> - Открыть топ чата.\n"
-        "• <code>/rating</code> - Открыть глобальный рейтинг.\n"
-        "• <code>/jackpot</code> - Проверить текущий джекпот.\n\n"
+        "<b>Быстрый старт:</b>\n"
+        "• <code>/start</code> - открыть личное меню.\n"
+        "• <code>/beer</code> - выпить пиво и получить 🍺.\n"
+        "• <code>/me</code> - посмотреть профиль.\n"
+        "• <code>/farm</code> - открыть ферму и пивоварню.\n"
+        "• <code>/top</code> - топ пива в текущем чате.\n"
+        "• <code>/rating</code> - глобальные рейтинги.\n\n"
         f"{DIVIDER}\n"
-        "<b>Мини-игры:</b>\n"
-        "• <code>/roulette &lt;ставка&gt; &lt;игроки&gt;</code> - Запустить 'Пивную рулетку' в группе.\n"
-        "• <code>/ladder &lt;ставка&gt;</code> - Начать игру в 'Пивную лесенку'.\n\n"
+        "<b>В группе можно писать без слэша:</b>\n"
+        "• <code>пиво</code>, <code>пивко</code>, <code>налей пиво</code>\n"
+        "• <code>ферма</code>, <code>моя ферма</code>\n"
+        "• <code>рейтинг пиво</code>, <code>рейт зерно</code>, <code>рейт хмель</code>\n\n"
         f"{DIVIDER}\n"
-        "<b>Прочее:</b>\n"
-        "• <code>/id</code> - Узнать свой User ID и ID текущего чата."
+        "Нажми кнопку ниже, чтобы открыть красивый справочник."
     )
 
 
