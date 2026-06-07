@@ -163,80 +163,28 @@
       border-radius: 8px;
       overflow: hidden;
       border: 1px solid #403723;
-      background:
-        linear-gradient(180deg, rgba(255,255,255,.05), transparent),
-        radial-gradient(circle at 50% 18%, rgba(244, 184, 74, .28), transparent 12rem),
-        linear-gradient(145deg, #1b1510, #161922);
+      background: #15171d;
       box-shadow: var(--shadow);
     }
 
-    .bar-shelf {
+    .scene-img {
       position: absolute;
-      left: 9%;
-      right: 9%;
-      height: 8px;
-      border-radius: 999px;
-      background: #4a2c16;
-      box-shadow: 0 92px 0 #4a2c16, 0 184px 0 #4a2c16;
-      top: 84px;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
     }
 
-    .mug {
-      position: absolute;
-      left: 50%;
-      bottom: 64px;
-      width: 180px;
-      height: 210px;
-      transform: translateX(-50%);
-      border: 10px solid #f0c167;
-      border-radius: 16px 16px 28px 28px;
-      background: linear-gradient(90deg, #d98b22 0%, #f4b84a 48%, #c7771d 100%);
-      box-shadow: inset 18px 0 rgba(255,255,255,.18), inset -14px 0 rgba(70,37,10,.18);
-    }
-
-    .mug::before {
+    .scene::after {
       content: "";
       position: absolute;
-      left: -12px;
-      right: -12px;
-      top: -45px;
-      height: 58px;
-      border-radius: 22px;
+      inset: 0;
       background:
-        radial-gradient(circle at 20% 50%, #fff7df 0 22px, transparent 23px),
-        radial-gradient(circle at 46% 35%, #fff1c7 0 28px, transparent 29px),
-        radial-gradient(circle at 72% 55%, #fff8e7 0 24px, transparent 25px),
-        #f8e8bf;
+        linear-gradient(90deg, rgba(15, 16, 20, .72), transparent 48%),
+        linear-gradient(180deg, transparent 58%, rgba(15, 16, 20, .36));
+      pointer-events: none;
     }
-
-    .mug::after {
-      content: "";
-      position: absolute;
-      right: -74px;
-      top: 42px;
-      width: 68px;
-      height: 92px;
-      border: 12px solid #f0c167;
-      border-left: 0;
-      border-radius: 0 46px 46px 0;
-    }
-
-    .coin, .hop {
-      position: absolute;
-      display: grid;
-      place-items: center;
-      width: 54px;
-      aspect-ratio: 1;
-      border-radius: 50%;
-      background: rgba(255,255,255,.06);
-      border: 1px solid rgba(255,255,255,.14);
-      font-size: 27px;
-    }
-
-    .coin:nth-child(3) { left: 12%; top: 38px; }
-    .coin:nth-child(4) { right: 14%; top: 134px; }
-    .coin:nth-child(5) { left: 16%; bottom: 70px; }
-    .hop { right: 12%; bottom: 42px; }
 
     .search-panel {
       margin-top: -24px;
@@ -498,20 +446,6 @@
       .nav-links { display: none; }
       .hero-grid { padding-top: 24px; }
       .scene { min-height: 300px; }
-      .mug {
-        width: 138px;
-        height: 166px;
-        bottom: 52px;
-      }
-      .mug::after {
-        right: -58px;
-        width: 54px;
-        height: 74px;
-      }
-      .coin, .hop {
-        width: 44px;
-        font-size: 22px;
-      }
     }
   </style>
 </head>
@@ -540,12 +474,7 @@
         </div>
       </div>
       <div class="scene" aria-label="Пивная кружка PIvaBot">
-        <div class="bar-shelf"></div>
-        <div class="coin">🍺</div>
-        <div class="coin">🌾</div>
-        <div class="coin">🎁</div>
-        <div class="hop">🌱</div>
-        <div class="mug"></div>
+        <img class="scene-img" src="assets/hero-pivnoybaron.png" alt="Пивная кружка на барной стойке с хмелем и зерном">
       </div>
     </div>
   </header>
