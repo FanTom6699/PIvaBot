@@ -9,11 +9,12 @@ from aiogram.filters.callback_data import CallbackData
 from database import Database
 from settings import SettingsManager
 from .beer_service import run_beer_attempt
-from .text_aliases import HELP_ALIASES, JACKPOT_ALIASES, GroupTextAlias
+from .text_aliases import GUIDE_ALIASES, HELP_ALIASES, JACKPOT_ALIASES, GroupTextAlias
 from utils import answer_to_trigger, format_time_delta, mention_user, mention_user_from_parts
 
 common_router = Router()
 DIVIDER = "<code>--- --- ---</code>"
+GUIDE_URL = "https://telegra.ph/Komandy-PIvaBot-06-07"
 
 
 class MainMenuCallback(CallbackData, prefix="menu"):
@@ -38,6 +39,9 @@ def get_main_menu_keyboard(user_id: int) -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="🎁 Джекпот", callback_data=MainMenuCallback(action="jackpot").pack()),
             InlineKeyboardButton(text="❓ Помощь", callback_data=MainMenuCallback(action="help").pack()),
         ],
+        [
+            InlineKeyboardButton(text="📘 Справочник", url=GUIDE_URL),
+        ],
     ])
 
 
@@ -45,6 +49,13 @@ def get_back_to_menu_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(text="⬅️ Назад в меню", callback_data=MainMenuCallback(action="home").pack())
     ]])
+
+
+def get_guide_keyboard(show_main_menu: bool = False) -> InlineKeyboardMarkup:
+    rows = [[InlineKeyboardButton(text="📘 Открыть справочник", url=GUIDE_URL)]]
+    if show_main_menu:
+        rows.append([InlineKeyboardButton(text="⬅️ Назад в меню", callback_data=MainMenuCallback(action="home").pack())])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def get_rating_keyboard(show_main_menu: bool = True) -> InlineKeyboardMarkup:
@@ -416,6 +427,14 @@ def get_help_text() -> str:
     )
 
 
+def get_guide_text() -> str:
+    return (
+        "📘 <b>Справочник PIvaBot</b>\n\n"
+        "Полный список команд, фраз и правил открыт в Telegraph.\n"
+        "Нажми кнопку ниже, чтобы открыть статью внутри Telegram."
+    )
+
+
 # --- ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ РЕГИСТРАЦИИ (ТВОЙ ТЕКСТ) ---
 async def check_user_registered(message_or_callback: Message | CallbackQuery, bot: Bot, db: Database) -> bool:
     user = message_or_callback.from_user
@@ -484,12 +503,27 @@ async def cmd_start(message: Message, bot: Bot, db: Database):
 
 @common_router.message(Command("help"))
 async def cmd_help(message: Message):
-    await answer_to_trigger(message, get_help_text(), parse_mode='HTML')
+    await answer_to_trigger(
+        message,
+        get_help_text(),
+        reply_markup=get_guide_keyboard(message.chat.type == "private"),
+        parse_mode='HTML'
+    )
 
 
 @common_router.message(GroupTextAlias(*HELP_ALIASES))
 async def alias_help(message: Message):
     await cmd_help(message)
+
+
+@common_router.message(Command("guide"))
+async def cmd_guide(message: Message):
+    await answer_to_trigger(message, get_guide_text(), reply_markup=get_guide_keyboard(), parse_mode='HTML')
+
+
+@common_router.message(GroupTextAlias(*GUIDE_ALIASES))
+async def alias_guide(message: Message):
+    await cmd_guide(message)
 
 
 @common_router.callback_query(MainMenuCallback.filter())
@@ -528,7 +562,7 @@ async def cq_main_menu(callback: CallbackQuery, callback_data: MainMenuCallback,
         keyboard = get_back_to_menu_keyboard()
     elif callback_data.action == "help":
         text = get_help_text()
-        keyboard = get_back_to_menu_keyboard()
+        keyboard = get_guide_keyboard(callback.message.chat.type == "private")
     elif callback_data.action == "beer":
         result = await run_beer_attempt(user.id, db, settings)
         if result["spam"]:
