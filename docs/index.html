@@ -341,6 +341,45 @@
       gap: 10px;
     }
 
+    .toc {
+      margin-top: 18px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.045), transparent),
+        var(--paper);
+    }
+
+    .toc h2 {
+      margin-bottom: 12px;
+      font-size: clamp(26px, 4vw, 38px);
+    }
+
+    .toc-list {
+      display: grid;
+      gap: 8px;
+      margin: 0;
+      padding-left: 28px;
+    }
+
+    .toc-list a {
+      display: inline;
+      padding: 1px 7px 3px;
+      border-radius: 6px;
+      color: var(--blue);
+      background: rgba(122, 167, 255, .14);
+      text-decoration: none;
+      font-weight: 800;
+      box-decoration-break: clone;
+      -webkit-box-decoration-break: clone;
+    }
+
+    .toc-list a:hover {
+      color: #bcd2ff;
+      background: rgba(122, 167, 255, .23);
+    }
+
     .row {
       display: grid;
       grid-template-columns: 210px minmax(0, 1fr);
@@ -466,6 +505,17 @@
     <div class="search-panel">
       <input id="search" class="search" type="search" placeholder="Найти команду или механику: пиво, ферма, рейтинг хмель, рулетка...">
     </div>
+
+    <section class="toc" aria-label="Оглавление">
+      <h2>Оглавление</h2>
+      <ol class="toc-list">
+        <li><a href="#commands">Основные команды</a></li>
+        <li><a href="#phrases">Фразы без слэша</a></li>
+        <li><a href="#farm">Ферма и производство</a></li>
+        <li><a href="#games">Мини-игры</a></li>
+        <li><a href="#start">Быстрый старт</a></li>
+      </ol>
+    </section>
 
     <section id="commands">
       <div class="section-head">
