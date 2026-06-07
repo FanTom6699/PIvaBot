@@ -334,6 +334,24 @@
       font: 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     }
 
+    .tag.copyable,
+    .cmd.copyable {
+      cursor: pointer;
+      user-select: none;
+      transition: border-color .16s ease, background .16s ease, color .16s ease, transform .16s ease;
+    }
+
+    .tag.copyable:hover,
+    .cmd.copyable:hover {
+      border-color: rgba(244, 184, 74, .72);
+      color: #ffe0a3;
+    }
+
+    .tag.copyable:active,
+    .cmd.copyable:active {
+      transform: translateY(1px);
+    }
+
     .wide { grid-column: span 2; }
 
     .list {
@@ -391,9 +409,40 @@
     }
 
     .cmd {
+      display: inline-flex;
+      width: fit-content;
+      align-items: center;
+      min-height: 30px;
+      padding: 0 8px;
+      border: 1px solid rgba(244, 184, 74, .28);
+      border-radius: 6px;
+      background: rgba(244, 184, 74, .08);
       color: var(--gold);
       font-weight: 800;
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .copy-toast {
+      position: fixed;
+      left: 50%;
+      bottom: 22px;
+      z-index: 50;
+      transform: translate(-50%, 16px);
+      opacity: 0;
+      pointer-events: none;
+      padding: 10px 14px;
+      border: 1px solid rgba(244, 184, 74, .38);
+      border-radius: 8px;
+      background: rgba(23, 25, 31, .94);
+      color: var(--text);
+      box-shadow: var(--shadow);
+      transition: opacity .18s ease, transform .18s ease;
+      white-space: nowrap;
+    }
+
+    .copy-toast.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
     }
 
     .steps {
@@ -622,9 +671,59 @@
     </footer>
   </main>
 
+  <div class="copy-toast" id="copyToast" role="status" aria-live="polite">Скопировано</div>
+
   <script>
     const input = document.querySelector("#search");
     const cards = [...document.querySelectorAll(".searchable")];
+    const toast = document.querySelector("#copyToast");
+    let toastTimer;
+
+    const copyText = async (text) => {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return;
+      }
+
+      const area = document.createElement("textarea");
+      area.value = text;
+      area.setAttribute("readonly", "");
+      area.style.position = "fixed";
+      area.style.opacity = "0";
+      document.body.appendChild(area);
+      area.select();
+      document.execCommand("copy");
+      area.remove();
+    };
+
+    const showCopied = (text) => {
+      toast.textContent = `Скопировано: ${text}`;
+      toast.classList.add("show");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove("show"), 1400);
+    };
+
+    document.querySelectorAll(".tag, .cmd").forEach((item) => {
+      item.classList.add("copyable");
+      item.title = "Нажми, чтобы скопировать";
+      item.setAttribute("role", "button");
+      item.setAttribute("tabindex", "0");
+
+      const runCopy = async () => {
+        const text = item.innerText.trim();
+        if (!text) return;
+        await copyText(text);
+        showCopied(text);
+      };
+
+      item.addEventListener("click", runCopy);
+      item.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          runCopy();
+        }
+      });
+    });
 
     input.addEventListener("input", () => {
       const query = input.value.trim().toLowerCase();
