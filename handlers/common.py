@@ -198,19 +198,20 @@ async def get_profile_text(user_id: int, user_name: str, db: Database, settings:
     user_name = mention_user(user_id, user_name)
     profile = await db.get_user_profile(user_id)
     rating = profile[3] if profile else 0
-    max_rating = profile[6] if profile and len(profile) > 6 and profile[6] is not None else rating
+    xp = profile[7] if profile and len(profile) > 7 and profile[7] is not None else 0
     registration_date = format_registration_date(profile[5] if profile else None)
     rank = await db.get_user_rank(user_id)
     rank_text = f"#{rank['rank']}" if rank else "—"
-    level, title = get_rating_level(max_rating)
+    level, title = get_xp_level(xp)
+    xp_progress = format_xp_progress(level, xp)
 
     return (
         f"👤 <b>Профиль</b>\n\n"
         f"<b>{user_name}</b>\n"
         f"{DIVIDER}\n"
         f"Уровень: <b>{level}</b> — <b>{title}</b>\n"
+        f"Опыт: <b>{xp_progress}</b> ⭐\n"
         f"Пиво: <b>{rating}</b> 🍺\n"
-        f"Рекорд: <b>{max_rating}</b> 🍺\n"
         f"Место: <b>{rank_text}</b>\n"
         f"В баре с: <b>{registration_date}</b>"
     )
@@ -220,62 +221,77 @@ async def get_compact_profile_text(user_id: int, user_name: str, db: Database, s
     user_name = mention_user(user_id, user_name)
     profile = await db.get_user_profile(user_id)
     rating = profile[3] if profile else 0
-    max_rating = profile[6] if profile and len(profile) > 6 and profile[6] is not None else rating
+    xp = profile[7] if profile and len(profile) > 7 and profile[7] is not None else 0
     registration_date = format_registration_date(profile[5] if profile else None)
     rank = await db.get_user_rank(user_id)
     rank_text = f"#{rank['rank']}" if rank else "—"
-    level, title = get_rating_level(max_rating)
+    level, title = get_xp_level(xp)
 
     return (
         f"👤 <b>{user_name}</b>\n\n"
         f"Ур. <b>{level}</b> — <b>{title}</b>\n"
+        f"XP: <b>{xp}</b> ⭐\n"
         f"Пиво: <b>{rating}</b> 🍺\n"
         f"Место в топе: <b>{rank_text}</b>\n"
         f"В баре с: <b>{registration_date}</b>"
     )
 
 
-RATING_LEVELS = [
-    (0, "🧐 Новичок"),
-    (100, "🍻 Выпивоха"),
-    (300, "🎩 Завсегдатай"),
-    (750, "😎 Свой в доску"),
-    (1500, "💪 Синяк"),
-    (3000, "⭐ V.I.P."),
-    (5000, "🍾 Сомелье"),
-    (7500, "🎗 Ветеран Бара"),
-    (10000, "🌟 Легенда Бара"),
-    (15000, "🎖 Элита"),
-    (20000, "🏆 Чемпион"),
-    (30000, "💎 Алмазный Алконафт"),
-    (40000, "🌀 Повелитель Пены"),
-    (50000, "🌌 Бог Пива"),
-    (65000, "🔱 Атлант"),
-    (80000, "🦄 Мифический"),
-    (100000, "🧙‍♂️ Пивной Магистр"),
-    (150000, "🦖 Пивозавр"),
-    (225000, "🤖 Барный Киборг"),
-    (300000, "🚀 Трижды Несокрушимый"),
-    (400000, "⚡️ Гроза Кранов"),
-    (500000, "🌪️ Лорд Хмельных Бурь"),
-    (650000, "👑 Император Пива"),
-    (800000, "🪐 Хозяин Галактики Пива"),
-    (1000000, "✨ Пивной Абсолют"),
+XP_LEVELS = [
+    (1, 0),
+    (2, 50),
+    (3, 120),
+    (4, 220),
+    (5, 350),
+    (6, 500),
+    (7, 700),
+    (8, 950),
+    (9, 1250),
+    (10, 1600),
+    (11, 2000),
+    (12, 2450),
+    (13, 2950),
+    (14, 3500),
+    (15, 4100),
+    (16, 4800),
+    (17, 5600),
+    (18, 6500),
+    (19, 7500),
+    (20, 8600),
 ]
 
+LEVEL_TITLES = {
+    1: "🧐 Новичок",
+    5: "🍻 Выпивоха",
+    10: "🎩 Завсегдатай",
+    15: "🍺 Пивовар",
+    20: "🏭 Мастер пивоварни",
+}
 
-def get_rating_level(rating: int) -> tuple[int, str]:
+
+def get_xp_level(xp: int) -> tuple[int, str]:
+    xp = max(0, xp)
     level = 1
-    title = RATING_LEVELS[0][1]
-    for index, (threshold, level_title) in enumerate(RATING_LEVELS, start=1):
-        if rating >= threshold:
-            level = index
-            title = level_title
-    return level, title
+    for level_number, threshold in XP_LEVELS:
+        if xp >= threshold:
+            level = level_number
+
+    title_level = max(title_level for title_level in LEVEL_TITLES if title_level <= level)
+    return level, LEVEL_TITLES[title_level]
 
 
-def get_rating_title(rating: int) -> str:
-    return get_rating_level(rating)[1]
+def get_next_level_xp(level: int) -> int | None:
+    for level_number, threshold in XP_LEVELS:
+        if level_number > level:
+            return threshold
+    return None
+
+
+def format_xp_progress(level: int, xp: int) -> str:
+    next_xp = get_next_level_xp(level)
+    if next_xp is None:
+        return f"{xp} / max"
+    return f"{xp} / {next_xp}"
 
 
 async def get_top_text(db: Database, user_id: int | None = None) -> str:

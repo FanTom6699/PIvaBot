@@ -27,15 +27,18 @@ class Database:
                     username TEXT,
                     beer_rating INTEGER DEFAULT 0,
                     max_beer_rating INTEGER DEFAULT 0,
+                    xp INTEGER DEFAULT 0,
                     last_beer_time TEXT,
                     created_at TEXT
                 )
             ''')
             await self._ensure_column(db, "users", "created_at", "TEXT")
             await self._ensure_column(db, "users", "max_beer_rating", "INTEGER DEFAULT 0")
+            await self._ensure_column(db, "users", "xp", "INTEGER DEFAULT 0")
             await db.execute(
                 "UPDATE users SET max_beer_rating = beer_rating WHERE max_beer_rating < beer_rating"
             )
+            await db.execute("UPDATE users SET xp = 0 WHERE xp IS NULL")
             await db.execute(
                 "UPDATE users SET created_at = ? WHERE created_at IS NULL",
                 (datetime.now().isoformat(),)
@@ -278,7 +281,7 @@ class Database:
     async def get_user_profile(self, user_id: int):
         async with aiosqlite.connect(self.db_name) as db:
             cursor = await db.execute(
-                "SELECT first_name, last_name, username, beer_rating, last_beer_time, created_at, max_beer_rating FROM users WHERE user_id = ?",
+                "SELECT first_name, last_name, username, beer_rating, last_beer_time, created_at, max_beer_rating, xp FROM users WHERE user_id = ?",
                 (user_id,)
             )
             return await cursor.fetchone()
@@ -288,6 +291,27 @@ class Database:
             cursor = await db.execute("SELECT beer_rating FROM users WHERE user_id = ?", (user_id,))
             result = await cursor.fetchone()
             return result[0] if result else 0
+
+    async def get_user_xp(self, user_id: int) -> int:
+        async with aiosqlite.connect(self.db_name) as db:
+            cursor = await db.execute("SELECT xp FROM users WHERE user_id = ?", (user_id,))
+            result = await cursor.fetchone()
+            return result[0] if result else 0
+
+    async def add_xp(self, user_id: int, amount: int, source: str | None = None) -> dict[str, int | str | None]:
+        """Adds XP from explicit game sources. Beer balance changes never call this automatically."""
+        if amount <= 0:
+            current_xp = await self.get_user_xp(user_id)
+            return {"old_xp": current_xp, "new_xp": current_xp, "added": 0, "source": source}
+
+        async with aiosqlite.connect(self.db_name) as db:
+            cursor = await db.execute("SELECT xp FROM users WHERE user_id = ?", (user_id,))
+            row = await cursor.fetchone()
+            current_xp = row[0] if row and row[0] is not None else 0
+            new_xp = current_xp + amount
+            await db.execute("UPDATE users SET xp = ? WHERE user_id = ?", (new_xp, user_id))
+            await db.commit()
+            return {"old_xp": current_xp, "new_xp": new_xp, "added": amount, "source": source}
 
     # --- ИЗМЕНЕНИЕ РЕЙТИНГА И ВРЕМЕНИ ---
     
