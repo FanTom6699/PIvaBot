@@ -2,7 +2,16 @@ import random
 
 WHEAT_ID = "пшеница"
 EGG_ID = "яйца"
-EGG_EMOJI = '<tg-emoji emoji-id="5283003846472277736">🥚</tg-emoji>'
+
+
+def custom_emoji(emoji_id: str, fallback: str) -> str:
+    return f'<tg-emoji emoji-id="{emoji_id}">{fallback}</tg-emoji>'
+
+
+WHEAT_EMOJI = custom_emoji("5281027628940172336", "🌾")
+EGG_EMOJI = custom_emoji("5283003846472277736", "🥚")
+CHICKEN_EMOJI = custom_emoji("5287452045316497268", "🐔")
+CHICKEN_FEED_EMOJI = custom_emoji("5283093740137781285", "🍽")
 
 START_FIELD_COUNT = 6
 START_WHEAT_AMOUNT = 6
@@ -35,13 +44,13 @@ CROP_CODE_TO_ID = {
 }
 
 CROP_SHORT = {
-    WHEAT_ID: "🌾 Пшеница",
-    "зерно": "🌾 Пшеница",
+    WHEAT_ID: f"{WHEAT_EMOJI} Пшеница",
+    "зерно": f"{WHEAT_EMOJI} Пшеница",
     "хмель": "🍃 Хмель",
 }
 
 FARM_ITEM_NAMES = {
-    WHEAT_ID: "🌾 Пшеница",
+    WHEAT_ID: f"{WHEAT_EMOJI} Пшеница",
     EGG_ID: f"{EGG_EMOJI} Яйца",
     "зерно": "🌾 Зерно",
     "хмель": "🍃 Хмель",
@@ -50,7 +59,7 @@ FARM_ITEM_NAMES = {
 }
 
 SILO_ITEMS = [
-    (WHEAT_ID, "🌾 Пшеница"),
+    (WHEAT_ID, f"{WHEAT_EMOJI} Пшеница"),
 ]
 
 BARN_ITEMS = [

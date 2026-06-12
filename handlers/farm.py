@@ -23,7 +23,9 @@ from .farm_config import (
     BARN_ITEMS,
     CHICKEN_BUY_COSTS,
     CHICKEN_COUNT,
+    CHICKEN_EMOJI,
     CHICKEN_FEED_COST,
+    CHICKEN_FEED_EMOJI,
     CHICKEN_FEED_ITEM_ID,
     CHICKEN_MAX_COUNT,
     CROP_CODE_TO_ID,
@@ -40,6 +42,7 @@ from .farm_config import (
     START_FIELD_COUNT,
     WHEAT_GROW_MINUTES,
     WHEAT_HARVEST_AMOUNT,
+    WHEAT_EMOJI,
     WHEAT_ID,
     WHEAT_PLANT_COST,
     WHEAT_XP_PER_ITEM,
@@ -139,7 +142,15 @@ def can_complete_order(order: dict, inventory: dict) -> bool:
 
 
 def chicken_feed_name() -> str:
+    if CHICKEN_FEED_ITEM_ID == WHEAT_ID:
+        return f"{CHICKEN_FEED_EMOJI} корм"
     return FARM_ITEM_NAMES.get(CHICKEN_FEED_ITEM_ID, CHICKEN_FEED_ITEM_ID)
+
+
+def chicken_feed_plain_name() -> str:
+    if CHICKEN_FEED_ITEM_ID == WHEAT_ID:
+        return "корма"
+    return CHICKEN_FEED_ITEM_ID
 
 
 def next_chicken_cost(chicken_count: int) -> int | None:
@@ -183,7 +194,7 @@ async def get_farm_dashboard(user_id: int, user_name: str, db: Database, show_ma
     barn_used = storage_used(inventory, BARN_ITEMS)
 
     text = (
-        "🌾 <b>Ферма</b>\n\n"
+        f"{WHEAT_EMOJI} <b>Ферма</b>\n\n"
         f"<b>{mention_user(user_id, user_name)}</b>\n"
         f"Уровень: <b>{level}</b> — <b>{title}</b>\n"
         f"XP: <b>{format_xp_progress(level, xp)}</b> ⭐\n\n"
@@ -192,7 +203,7 @@ async def get_farm_dashboard(user_id: int, user_name: str, db: Database, show_ma
         f"Свободно: <b>{counts['free']}</b>\n"
         f"Растёт: <b>{counts['growing']}</b>\n"
         f"Готово: <b>{counts['ready']}</b>\n\n"
-        f"🌾 Силос: <b>{silo_used} / {SILO_CAPACITY}</b>\n"
+        f"{WHEAT_EMOJI} Силос: <b>{silo_used} / {SILO_CAPACITY}</b>\n"
         f"📦 Амбар: <b>{barn_used} / {BARN_CAPACITY}</b>"
     )
 
@@ -229,10 +240,10 @@ async def get_plots_dashboard(user_id: int, db: Database) -> tuple[str, InlineKe
         f"Свободные грядки: <b>{counts['free']}</b>\n"
         f"Растущие культуры: <b>{counts['growing']}</b>\n"
         f"Готовые культуры: <b>{counts['ready']}</b>\n\n"
-        f"Посадка: <b>{WHEAT_PLANT_COST}</b> 🌾 пшеница\n"
+        f"Посадка: <b>{WHEAT_PLANT_COST}</b> {WHEAT_EMOJI} пшеница\n"
         f"Рост: <b>{WHEAT_GROW_MINUTES} мин.</b>\n"
-        f"Сбор: <b>+{WHEAT_HARVEST_AMOUNT}</b> 🌾 пшеницы и <b>+{WHEAT_HARVEST_AMOUNT * WHEAT_XP_PER_ITEM}</b> XP\n"
-        f"В силосе: <b>{inventory.get(WHEAT_ID, 0)}</b> 🌾"
+        f"Сбор: <b>+{WHEAT_HARVEST_AMOUNT}</b> {WHEAT_EMOJI} пшеницы и <b>+{WHEAT_HARVEST_AMOUNT * WHEAT_XP_PER_ITEM}</b> XP\n"
+        f"В силосе: <b>{inventory.get(WHEAT_ID, 0)}</b> {WHEAT_EMOJI}"
     )
 
     buttons = []
@@ -318,7 +329,7 @@ async def get_plot_list_page(user_id: int, db: Database, page: int = 0) -> tuple
 
 def get_animals_menu(user_id: int) -> tuple[str, InlineKeyboardMarkup]:
     text = (
-        "🐔 <b>Животные</b>\n\n"
+        f"{CHICKEN_EMOJI} <b>Животные</b>\n\n"
         "Здесь будут отдельные постройки для животных.\n\n"
         f"{DIVIDER}\n"
         "Сейчас доступен курятник."
@@ -342,11 +353,11 @@ async def get_chicken_coop_menu(user_id: int, db: Database) -> tuple[str, Inline
     feed_name = chicken_feed_name()
 
     text = (
-        "🐔 <b>Курятник</b>\n\n"
+        f"{CHICKEN_EMOJI} <b>Курятник</b>\n\n"
         "Здание для кур. Каждая курица работает отдельно: её нужно покормить, дождаться яйца и собрать награду.\n\n"
         f"{DIVIDER}\n"
-        f"🐔 Куры: <b>{chicken_count} / {chicken_max_count}</b>\n"
-        f"🐔 Корм: <b>{feed_amount}</b> {feed_name}\n"
+        f"{CHICKEN_EMOJI} Куры: <b>{chicken_count} / {chicken_max_count}</b>\n"
+        f"Корм: <b>{feed_amount}</b> {feed_name}\n"
         f"📦 Амбар: <b>{barn_used} / {BARN_CAPACITY}</b>\n\n"
     )
 
@@ -354,7 +365,7 @@ async def get_chicken_coop_menu(user_id: int, db: Database) -> tuple[str, Inline
     for chicken in chickens:
         chicken_num = chicken["chicken_number"]
         state = chicken.get("state")
-        text += f"🐔 <b>Курица #{chicken_num}</b>\n"
+        text += f"{CHICKEN_EMOJI} <b>Курица #{chicken_num}</b>\n"
         if state == "ready":
             status_line = f"{EGG_EMOJI} Яйцо готово"
         elif state == "producing":
@@ -362,7 +373,7 @@ async def get_chicken_coop_menu(user_id: int, db: Database) -> tuple[str, Inline
             left = format_time_delta(ready_time - now) if ready_time else "скоро"
             status_line = f"⏳ До готовности: <b>{left}</b>"
         else:
-            status_line = "🍽 Требуется корм"
+            status_line = f"{CHICKEN_FEED_EMOJI} Требуется корм"
         button_text = f"🐔 Курица #{chicken_num}"
 
         text += f"{status_line}\n\n"
@@ -387,7 +398,7 @@ async def get_chicken_shop_menu(user_id: int, db: Database) -> tuple[str, Inline
         "🏪 <b>Магазин курятника</b>\n\n"
         "Здесь можно докупить кур до лимита текущего этапа.\n\n"
         f"{DIVIDER}\n"
-        f"🐔 Куры: <b>{chicken_count} / {chicken_max_count}</b>\n"
+        f"{CHICKEN_EMOJI} Куры: <b>{chicken_count} / {chicken_max_count}</b>\n"
         f"🍺 Баланс: <b>{balance}</b>\n"
     )
 
@@ -421,7 +432,7 @@ async def get_chicken_card(user_id: int, chicken_num: int, db: Database) -> tupl
     feed_name = chicken_feed_name()
 
     if not chicken:
-        text = "🐔 <b>Курица не найдена</b>\n\nОткрой курятник заново."
+        text = f"{CHICKEN_EMOJI} <b>Курица не найдена</b>\n\nОткрой курятник заново."
         return text, InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(text="⬅️ Назад", callback_data=FarmCallback(action="chicken_coop", owner_id=user_id).pack())
         ]])
@@ -446,7 +457,7 @@ async def get_chicken_card(user_id: int, chicken_num: int, db: Database) -> tupl
         status = "⏳ Производит яйцо"
         details = f"<b>До готовности:</b>\n{left}"
     else:
-        status = "🍽 Требуется корм"
+        status = f"{CHICKEN_FEED_EMOJI} Требуется корм"
         details = (
             f"Корм: <b>{inventory.get(CHICKEN_FEED_ITEM_ID, 0)}</b> {feed_name}\n"
             f"Нужно: <b>{CHICKEN_FEED_COST}</b> {feed_name}"
@@ -457,7 +468,7 @@ async def get_chicken_card(user_id: int, chicken_num: int, db: Database) -> tupl
         )])
 
     text = (
-        f"🐔 <b>Курица #{chicken_num}</b>\n\n"
+        f"{CHICKEN_EMOJI} <b>Курица #{chicken_num}</b>\n\n"
         f"Статус: <b>{status}</b>\n\n"
         f"{details}"
     )
@@ -484,7 +495,7 @@ async def get_silo_menu(user_id: int, db: Database) -> tuple[str, InlineKeyboard
     inventory = await db.get_user_inventory(user_id)
     used = storage_used(inventory, SILO_ITEMS)
     text = (
-        f"🌾 <b>Силос: {used} / {SILO_CAPACITY}</b>\n\n"
+        f"{WHEAT_EMOJI} <b>Силос: {used} / {SILO_CAPACITY}</b>\n\n"
         + "\n".join(f"{label}: <b>{inventory.get(item_id, 0)}</b>" for item_id, label in SILO_ITEMS)
         + "\n\n<i>Силос хранит культуры с полей.</i>"
     )
@@ -860,7 +871,7 @@ async def cq_chicken_feed(callback: CallbackQuery, callback_data: ChickenCallbac
 
     inventory = await db.get_user_inventory(user_id)
     if inventory.get(CHICKEN_FEED_ITEM_ID, 0) < CHICKEN_FEED_COST:
-        await callback.answer(f"Нужно {CHICKEN_FEED_COST} {chicken_feed_name()}.", show_alert=True)
+        await callback.answer(f"Нужно {CHICKEN_FEED_COST} {chicken_feed_plain_name()}.", show_alert=True)
         return
     if not await db.modify_inventory(user_id, CHICKEN_FEED_ITEM_ID, -CHICKEN_FEED_COST):
         await callback.answer("Не получилось списать корм.", show_alert=True)
