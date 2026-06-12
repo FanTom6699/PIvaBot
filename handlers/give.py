@@ -27,8 +27,8 @@ GIVE_HELP_TEXT = (
     "• <code>@username</code>\n"
     "• <code>User ID</code>\n\n"
     "<b>&lt;Ресурсы&gt;:</b>\n"
-    "• <code>зерно</code> (🌾 Урожай)\n"
-    "• <code>хмель</code> (🌱 Урожай)"
+    "• <code>пшеница</code> (🌾 Силос)\n"
+    "• <code>яйца</code> (🥚 Амбар)"
 )
 
 # --- ХЭНДЛЕР ---

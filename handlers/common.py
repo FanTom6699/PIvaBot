@@ -142,6 +142,8 @@ def format_registration_date(created_at: str | None) -> str:
 
 
 async def get_farm_profile_status(user_id: int, db: Database, show_inventory: bool = False) -> str:
+    from .farm_config import BARN_CAPACITY, BARN_ITEMS, SILO_CAPACITY, SILO_ITEMS, START_FIELD_COUNT
+
     farm = await db.get_user_farm_data(user_id)
     inventory = await db.get_user_inventory(user_id)
     plots = await db.get_user_plots(user_id)
@@ -149,7 +151,9 @@ async def get_farm_profile_status(user_id: int, db: Database, show_inventory: bo
 
     ready_plots = 0
     growing_plots = 0
-    for _, _, ready_time in plots:
+    for plot_number, _, ready_time in plots:
+        if plot_number > START_FIELD_COUNT:
+            continue
         try:
             ready_dt = datetime.fromisoformat(ready_time) if isinstance(ready_time, str) else ready_time
         except ValueError:
@@ -160,36 +164,26 @@ async def get_farm_profile_status(user_id: int, db: Database, show_inventory: bo
         elif ready_dt:
             growing_plots += 1
 
-    batch_timer = farm.get("brewery_batch_timer_end")
-    if batch_timer and now >= batch_timer:
-        brewery_status = "партия готова"
-    elif batch_timer:
-        brewery_status = f"варится {format_time_delta(batch_timer - now)}"
+    chicken_timer = farm.get("chicken_timer_end")
+    if chicken_timer and now >= chicken_timer:
+        chicken_status = "яйца готовы"
+    elif chicken_timer:
+        chicken_status = f"яйца через {format_time_delta(chicken_timer - now)}"
     else:
-        brewery_status = "свободна"
+        chicken_status = "таймер не запущен"
 
-    field_upgrade = farm.get("field_upgrade_timer_end")
-    brewery_upgrade = farm.get("brewery_upgrade_timer_end")
-    upgrade_lines = []
-    if field_upgrade and now < field_upgrade:
-        upgrade_lines.append(f"Поле улучшается: <b>{format_time_delta(field_upgrade - now)}</b>")
-    if brewery_upgrade and now < brewery_upgrade:
-        upgrade_lines.append(f"Пивоварня улучшается: <b>{format_time_delta(brewery_upgrade - now)}</b>")
+    silo_used = sum(max(0, int(inventory.get(item_id, 0))) for item_id, _ in SILO_ITEMS)
+    barn_used = sum(max(0, int(inventory.get(item_id, 0))) for item_id, _ in BARN_ITEMS)
 
     lines = [
-        f"Поле: ур. <b>{farm.get('field_level', 1)}</b>",
-        f"Пивоварня: ур. <b>{farm.get('brewery_level', 1)}</b>",
+        f"Поля: <b>{START_FIELD_COUNT}</b>",
         f"Грядки: <b>{ready_plots}</b> готово / <b>{growing_plots}</b> растет",
-        f"Варка: <b>{brewery_status}</b>",
+        f"Курятник: <b>{chicken_status}</b>",
     ]
 
-    if upgrade_lines:
-        lines.extend(upgrade_lines)
-
     if show_inventory:
-        lines.append(
-            f"Склад: <b>{inventory.get('зерно', 0)}</b> 🌾 / <b>{inventory.get('хмель', 0)}</b> 🌱"
-        )
+        lines.append(f"Силос: <b>{silo_used} / {SILO_CAPACITY}</b>")
+        lines.append(f"Амбар: <b>{barn_used} / {BARN_CAPACITY}</b>")
 
     return "\n".join(lines)
 

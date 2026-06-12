@@ -7,8 +7,12 @@ from typing import Dict, Any, List, Tuple
 
 # --- КОНСТАНТЫ ---
 DEFAULT_INVENTORY = {
-    'зерно': 0, 'хмель': 0,
-    'кукуруза': 0, 'яйца': 0, 'молоко': 0
+    'пшеница': 6,
+    'яйца': 0,
+    'зерно': 0,
+    'хмель': 0,
+    'кукуруза': 0,
+    'молоко': 0
 }
 
 class Database:
@@ -62,9 +66,13 @@ class Database:
                     brewery_batch_size INTEGER DEFAULT 0,
                     brewery_batch_timer_end TEXT,
                     field_upgrade_timer_end TEXT,
-                    brewery_upgrade_timer_end TEXT
+                    brewery_upgrade_timer_end TEXT,
+                    chicken_count INTEGER DEFAULT 2,
+                    chicken_timer_end TEXT
                 )
             ''')
+            await self._ensure_column(db, "user_farm_data", "chicken_count", "INTEGER DEFAULT 2")
+            await self._ensure_column(db, "user_farm_data", "chicken_timer_end", "TEXT")
             await db.execute('''
                 CREATE TABLE IF NOT EXISTS user_plots (
                     user_id INTEGER,
@@ -113,9 +121,11 @@ class Database:
             await db.execute('''
                 CREATE TABLE IF NOT EXISTS user_orders_meta (
                     user_id INTEGER PRIMARY KEY,
-                    last_reset_time TEXT
+                    last_reset_time TEXT,
+                    next_order_time TEXT
                 )
             ''')
+            await self._ensure_column(db, "user_orders_meta", "next_order_time", "TEXT")
             await db.execute('''
                 CREATE TABLE IF NOT EXISTS user_shop_purchases (
                     user_id INTEGER,
@@ -572,7 +582,7 @@ class Database:
 
             data = dict(row)
             # Конвертируем строки дат в datetime
-            for key in ['brewery_batch_timer_end', 'field_upgrade_timer_end', 'brewery_upgrade_timer_end']:
+            for key in ['brewery_batch_timer_end', 'field_upgrade_timer_end', 'brewery_upgrade_timer_end', 'chicken_timer_end']:
                 if data.get(key):
                     try:
                         data[key] = datetime.fromisoformat(data[key])
@@ -682,6 +692,18 @@ class Database:
             await db.commit()
             return row[0]
 
+    async def set_chicken_timer(self, user_id: int, end_time: datetime):
+        async with aiosqlite.connect(self.db_name) as db:
+            await db.execute(
+                "INSERT OR IGNORE INTO user_farm_data (user_id) VALUES (?)",
+                (user_id,)
+            )
+            await db.execute(
+                "UPDATE user_farm_data SET chicken_timer_end = ? WHERE user_id = ?",
+                (end_time.isoformat(), user_id)
+            )
+            await db.commit()
+
     async def start_brewing(self, user_id: int, batch_size: int, end_time: datetime):
         async with aiosqlite.connect(self.db_name) as db:
             await db.execute(
@@ -742,6 +764,74 @@ class Database:
             await db.commit()
 
     # --- ✅ ЗАКАЗЫ (ORDERS) ---
+
+    async def get_current_order(self, user_id: int) -> Tuple[str | None, datetime | None]:
+        from handlers.farm_config import FARM_ORDER_POOL, get_random_order
+
+        now = datetime.now()
+        async with aiosqlite.connect(self.db_name) as db:
+            cursor = await db.execute(
+                "SELECT order_id, is_completed FROM user_orders WHERE user_id = ? AND slot_id = 1",
+                (user_id,)
+            )
+            row = await cursor.fetchone()
+            if row and row[1] == 0 and row[0] in FARM_ORDER_POOL:
+                return row[0], None
+
+            cursor = await db.execute(
+                "SELECT next_order_time FROM user_orders_meta WHERE user_id = ?",
+                (user_id,)
+            )
+            meta = await cursor.fetchone()
+            if meta and meta[0]:
+                try:
+                    next_order_time = datetime.fromisoformat(meta[0])
+                    if now < next_order_time:
+                        return None, next_order_time
+                except ValueError:
+                    pass
+
+            order_id = get_random_order()
+            await db.execute("DELETE FROM user_orders WHERE user_id = ?", (user_id,))
+            await db.execute(
+                "INSERT OR REPLACE INTO user_orders (user_id, slot_id, order_id, is_completed) VALUES (?, 1, ?, 0)",
+                (user_id, order_id)
+            )
+            await db.execute(
+                """
+                INSERT INTO user_orders_meta (user_id, last_reset_time, next_order_time)
+                VALUES (?, ?, NULL)
+                ON CONFLICT(user_id) DO UPDATE SET last_reset_time = excluded.last_reset_time, next_order_time = NULL
+                """,
+                (user_id, now.isoformat())
+            )
+            await db.commit()
+            return order_id, None
+
+    async def complete_current_order(self, user_id: int, order_id: str, cooldown_minutes: int) -> bool:
+        next_order_time = datetime.now() + timedelta(minutes=cooldown_minutes)
+        async with aiosqlite.connect(self.db_name) as db:
+            cursor = await db.execute(
+                """
+                SELECT 1 FROM user_orders
+                WHERE user_id = ? AND slot_id = 1 AND order_id = ? AND is_completed = 0
+                """,
+                (user_id, order_id)
+            )
+            if not await cursor.fetchone():
+                return False
+
+            await db.execute("DELETE FROM user_orders WHERE user_id = ?", (user_id,))
+            await db.execute(
+                """
+                INSERT INTO user_orders_meta (user_id, last_reset_time, next_order_time)
+                VALUES (?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET last_reset_time = excluded.last_reset_time, next_order_time = excluded.next_order_time
+                """,
+                (user_id, datetime.now().isoformat(), next_order_time.isoformat())
+            )
+            await db.commit()
+            return True
 
     async def check_and_reset_orders(self, user_id: int):
         """Проверяет, прошло ли 24 часа. Если да - удаляет старые заказы."""
