@@ -144,9 +144,9 @@ def format_registration_date(created_at: str | None) -> str:
 async def get_farm_profile_status(user_id: int, db: Database, show_inventory: bool = False) -> str:
     from .farm_config import BARN_CAPACITY, BARN_ITEMS, SILO_CAPACITY, SILO_ITEMS, START_FIELD_COUNT
 
-    farm = await db.get_user_farm_data(user_id)
     inventory = await db.get_user_inventory(user_id)
     plots = await db.get_user_plots(user_id)
+    chickens = await db.get_user_chickens(user_id)
     now = datetime.now()
 
     ready_plots = 0
@@ -164,13 +164,10 @@ async def get_farm_profile_status(user_id: int, db: Database, show_inventory: bo
         elif ready_dt:
             growing_plots += 1
 
-    chicken_timer = farm.get("chicken_timer_end")
-    if chicken_timer and now >= chicken_timer:
-        chicken_status = "яйца готовы"
-    elif chicken_timer:
-        chicken_status = f"яйца через {format_time_delta(chicken_timer - now)}"
-    else:
-        chicken_status = "нужно покормить"
+    ready_eggs = sum(1 for chicken in chickens if chicken.get("state") == "ready")
+    producing = sum(1 for chicken in chickens if chicken.get("state") == "producing")
+    needs_feed = sum(1 for chicken in chickens if chicken.get("state") == "needs_feed")
+    chicken_status = f"{ready_eggs} готово / {producing} производят / {needs_feed} ждут корм"
 
     silo_used = sum(max(0, int(inventory.get(item_id, 0))) for item_id, _ in SILO_ITEMS)
     barn_used = sum(max(0, int(inventory.get(item_id, 0))) for item_id, _ in BARN_ITEMS)

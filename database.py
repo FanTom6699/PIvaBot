@@ -68,11 +68,22 @@ class Database:
                     field_upgrade_timer_end TEXT,
                     brewery_upgrade_timer_end TEXT,
                     chicken_count INTEGER DEFAULT 2,
+                    chicken_max_count INTEGER DEFAULT 2,
                     chicken_timer_end TEXT
                 )
             ''')
             await self._ensure_column(db, "user_farm_data", "chicken_count", "INTEGER DEFAULT 2")
+            await self._ensure_column(db, "user_farm_data", "chicken_max_count", "INTEGER DEFAULT 2")
             await self._ensure_column(db, "user_farm_data", "chicken_timer_end", "TEXT")
+            await db.execute('''
+                CREATE TABLE IF NOT EXISTS user_chickens (
+                    user_id INTEGER,
+                    chicken_number INTEGER,
+                    state TEXT DEFAULT 'needs_feed',
+                    ready_time TEXT,
+                    PRIMARY KEY (user_id, chicken_number)
+                )
+            ''')
             await db.execute('''
                 CREATE TABLE IF NOT EXISTS user_plots (
                     user_id INTEGER,
@@ -711,6 +722,175 @@ class Database:
                 (user_id,)
             )
             await db.commit()
+
+    async def _ensure_user_chickens(self, db: aiosqlite.Connection, user_id: int):
+        from handlers.farm_config import CHICKEN_COUNT, CHICKEN_MAX_COUNT
+
+        now = datetime.now()
+        await db.execute("INSERT OR IGNORE INTO user_farm_data (user_id) VALUES (?)", (user_id,))
+        cursor = await db.execute(
+            "SELECT chicken_count, chicken_max_count, chicken_timer_end FROM user_farm_data WHERE user_id = ?",
+            (user_id,)
+        )
+        farm_row = await cursor.fetchone()
+        chicken_count = (farm_row[0] if farm_row and farm_row[0] else CHICKEN_COUNT)
+        chicken_max_count = (farm_row[1] if farm_row and len(farm_row) > 1 and farm_row[1] else CHICKEN_MAX_COUNT)
+        chicken_max_count = max(chicken_count, chicken_max_count)
+
+        await db.execute(
+            "UPDATE user_farm_data SET chicken_count = ?, chicken_max_count = ? WHERE user_id = ?",
+            (chicken_count, chicken_max_count, user_id)
+        )
+
+        cursor = await db.execute("SELECT COUNT(*) FROM user_chickens WHERE user_id = ?", (user_id,))
+        existing_count = (await cursor.fetchone())[0]
+
+        legacy_timer = farm_row[2] if farm_row and len(farm_row) > 2 else None
+        if existing_count == 0:
+            state = "needs_feed"
+            ready_time = None
+            if legacy_timer:
+                try:
+                    legacy_dt = datetime.fromisoformat(legacy_timer)
+                    state = "ready" if now >= legacy_dt else "producing"
+                    ready_time = legacy_dt.isoformat()
+                except ValueError:
+                    state = "needs_feed"
+                    ready_time = None
+
+            for chicken_number in range(1, chicken_count + 1):
+                await db.execute(
+                    """
+                    INSERT OR IGNORE INTO user_chickens (user_id, chicken_number, state, ready_time)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (user_id, chicken_number, state, ready_time)
+                )
+            await db.execute("UPDATE user_farm_data SET chicken_timer_end = NULL WHERE user_id = ?", (user_id,))
+        elif existing_count < chicken_count:
+            cursor = await db.execute(
+                "SELECT chicken_number FROM user_chickens WHERE user_id = ?",
+                (user_id,)
+            )
+            existing_numbers = {row[0] for row in await cursor.fetchall()}
+            for chicken_number in range(1, chicken_count + 1):
+                if chicken_number in existing_numbers:
+                    continue
+                await db.execute(
+                    """
+                    INSERT OR IGNORE INTO user_chickens (user_id, chicken_number, state, ready_time)
+                    VALUES (?, ?, 'needs_feed', NULL)
+                    """,
+                    (user_id, chicken_number)
+                )
+
+        await db.execute(
+            """
+            UPDATE user_chickens
+            SET state = 'ready'
+            WHERE user_id = ? AND state = 'producing' AND ready_time IS NOT NULL AND ready_time <= ?
+            """,
+            (user_id, now.isoformat())
+        )
+
+    async def get_user_chickens(self, user_id: int) -> List[Dict[str, Any]]:
+        async with aiosqlite.connect(self.db_name) as db:
+            await self._ensure_user_chickens(db, user_id)
+            await db.commit()
+
+            db.row_factory = aiosqlite.Row
+            cursor = await db.execute(
+                """
+                SELECT chicken_number, state, ready_time
+                FROM user_chickens
+                WHERE user_id = ?
+                ORDER BY chicken_number ASC
+                """,
+                (user_id,)
+            )
+            rows = await cursor.fetchall()
+
+        chickens = []
+        for row in rows:
+            chicken = dict(row)
+            if chicken.get("ready_time"):
+                try:
+                    chicken["ready_time"] = datetime.fromisoformat(chicken["ready_time"])
+                except ValueError:
+                    chicken["ready_time"] = None
+            chickens.append(chicken)
+        return chickens
+
+    async def get_user_chicken(self, user_id: int, chicken_number: int) -> Dict[str, Any] | None:
+        async with aiosqlite.connect(self.db_name) as db:
+            await self._ensure_user_chickens(db, user_id)
+            await db.commit()
+
+            db.row_factory = aiosqlite.Row
+            cursor = await db.execute(
+                """
+                SELECT chicken_number, state, ready_time
+                FROM user_chickens
+                WHERE user_id = ? AND chicken_number = ?
+                """,
+                (user_id, chicken_number)
+            )
+            row = await cursor.fetchone()
+
+        if not row:
+            return None
+
+        chicken = dict(row)
+        if chicken.get("ready_time"):
+            try:
+                chicken["ready_time"] = datetime.fromisoformat(chicken["ready_time"])
+            except ValueError:
+                chicken["ready_time"] = None
+        return chicken
+
+    async def feed_chicken(self, user_id: int, chicken_number: int, ready_time: datetime) -> bool:
+        async with aiosqlite.connect(self.db_name) as db:
+            await self._ensure_user_chickens(db, user_id)
+            cursor = await db.execute(
+                "SELECT state FROM user_chickens WHERE user_id = ? AND chicken_number = ?",
+                (user_id, chicken_number)
+            )
+            row = await cursor.fetchone()
+            if not row or row[0] != "needs_feed":
+                return False
+
+            await db.execute(
+                """
+                UPDATE user_chickens
+                SET state = 'producing', ready_time = ?
+                WHERE user_id = ? AND chicken_number = ?
+                """,
+                (ready_time.isoformat(), user_id, chicken_number)
+            )
+            await db.commit()
+            return True
+
+    async def collect_chicken_egg(self, user_id: int, chicken_number: int) -> bool:
+        async with aiosqlite.connect(self.db_name) as db:
+            await self._ensure_user_chickens(db, user_id)
+            cursor = await db.execute(
+                "SELECT state FROM user_chickens WHERE user_id = ? AND chicken_number = ?",
+                (user_id, chicken_number)
+            )
+            row = await cursor.fetchone()
+            if not row or row[0] != "ready":
+                return False
+
+            await db.execute(
+                """
+                UPDATE user_chickens
+                SET state = 'needs_feed', ready_time = NULL
+                WHERE user_id = ? AND chicken_number = ?
+                """,
+                (user_id, chicken_number)
+            )
+            await db.commit()
+            return True
 
     async def start_brewing(self, user_id: int, batch_size: int, end_time: datetime):
         async with aiosqlite.connect(self.db_name) as db:

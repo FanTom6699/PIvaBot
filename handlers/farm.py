@@ -23,6 +23,8 @@ from .farm_config import (
     BARN_ITEMS,
     CHICKEN_COUNT,
     CHICKEN_FEED_COST,
+    CHICKEN_FEED_ITEM_ID,
+    CHICKEN_MAX_COUNT,
     CROP_CODE_TO_ID,
     CROP_SHORT,
     EGG_ID,
@@ -69,6 +71,12 @@ class OrderCallback(CallbackData, prefix="order"):
     action: str
     owner_id: int
     order_id: str
+
+
+class ChickenCallback(CallbackData, prefix="chicken"):
+    action: str
+    owner_id: int
+    chicken_num: int
 
 
 def rows(buttons: list[InlineKeyboardButton], per_row: int) -> list[list[InlineKeyboardButton]]:
@@ -126,6 +134,10 @@ def order_items_text(order: dict, inventory: dict) -> str:
 
 def can_complete_order(order: dict, inventory: dict) -> bool:
     return all(inventory.get(item_id, 0) >= amount for item_id, amount in order["items"].items())
+
+
+def chicken_feed_name() -> str:
+    return FARM_ITEM_NAMES.get(CHICKEN_FEED_ITEM_ID, CHICKEN_FEED_ITEM_ID)
 
 
 def format_level_alert(old_xp: int, new_xp: int) -> str:
@@ -315,31 +327,100 @@ def get_animals_menu(user_id: int) -> tuple[str, InlineKeyboardMarkup]:
 async def get_chicken_coop_menu(user_id: int, db: Database) -> tuple[str, InlineKeyboardMarkup]:
     farm = await db.get_user_farm_data(user_id)
     inventory = await db.get_user_inventory(user_id)
-    chicken_count = farm.get("chicken_count") or CHICKEN_COUNT
-    timer_end = farm.get("chicken_timer_end")
+    chickens = await db.get_user_chickens(user_id)
+    chicken_count = len(chickens) or (farm.get("chicken_count") or CHICKEN_COUNT)
+    chicken_max_count = farm.get("chicken_max_count") or CHICKEN_MAX_COUNT
     now = datetime.now()
-    buttons = []
-
-    if timer_end and now >= timer_end:
-        status = f"Готово к сбору: <b>{chicken_count}</b> 🥚"
-        buttons.append([InlineKeyboardButton(text=f"🥚 Собрать яйца x{chicken_count}", callback_data=FarmCallback(action="collect_eggs", owner_id=user_id).pack())])
-    elif timer_end:
-        status = f"Куры накормлены.\nДо яиц: <b>{format_time_delta(timer_end - now)}</b>"
-    else:
-        status = "Куры ждут корм."
-        buttons.append([InlineKeyboardButton(text=f"🌾 Покормить · {CHICKEN_FEED_COST} пшеницы", callback_data=FarmCallback(action="feed_chickens", owner_id=user_id).pack())])
+    ready_count = sum(1 for chicken in chickens if chicken.get("state") == "ready")
+    barn_used = storage_used(inventory, BARN_ITEMS)
+    feed_amount = inventory.get(CHICKEN_FEED_ITEM_ID, 0)
+    feed_name = chicken_feed_name()
 
     text = (
         "🐔 <b>Курятник</b>\n\n"
+        "Здание для кур. Каждая курица работает отдельно: её нужно покормить, дождаться яйца и собрать награду.\n\n"
         f"{DIVIDER}\n"
-        f"Куры: <b>{chicken_count}</b>\n"
-        f"Корм: <b>{CHICKEN_FEED_COST}</b> 🌾 пшеницы за цикл\n"
-        f"В силосе: <b>{inventory.get(WHEAT_ID, 0)}</b> 🌾\n\n"
-        f"{status}\n\n"
-        f"После кормления каждая курица даёт <b>1</b> 🥚 за <b>{EGG_PRODUCTION_MINUTES} мин.</b>\n"
-        f"Сбор яйца: <b>+{EGG_XP_PER_ITEM}</b> XP"
+        f"🐔 Куры: <b>{chicken_count} / {chicken_max_count}</b>\n"
+        f"🐔 Корм: <b>{feed_amount}</b> {feed_name}\n"
+        f"🥚 Готово яиц: <b>{ready_count}</b>\n"
+        f"📦 Амбар: <b>{barn_used} / {BARN_CAPACITY}</b>\n\n"
     )
+
+    buttons = []
+    for chicken in chickens:
+        chicken_num = chicken["chicken_number"]
+        state = chicken.get("state")
+        text += f"🐔 <b>Курица #{chicken_num}</b>\n"
+        if state == "ready":
+            status_line = "🥚 Яйцо готово"
+            button_text = f"🐔 #{chicken_num} · 🥚 готово"
+        elif state == "producing":
+            ready_time = chicken.get("ready_time")
+            left = format_time_delta(ready_time - now) if ready_time else "скоро"
+            status_line = f"⏳ До готовности: <b>{left}</b>"
+            button_text = f"🐔 #{chicken_num} · ⏳ {left}"
+        else:
+            status_line = "🍽 Требуется корм"
+            button_text = f"🐔 #{chicken_num} · 🍽 корм"
+
+        text += f"{status_line}\n\n"
+        buttons.append([InlineKeyboardButton(
+            text=button_text,
+            callback_data=ChickenCallback(action="view", owner_id=user_id, chicken_num=chicken_num).pack(),
+        )])
+
     buttons.append([InlineKeyboardButton(text="⬅️ Назад", callback_data=FarmCallback(action="animals", owner_id=user_id).pack())])
+    return text, InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+async def get_chicken_card(user_id: int, chicken_num: int, db: Database) -> tuple[str, InlineKeyboardMarkup]:
+    chicken = await db.get_user_chicken(user_id, chicken_num)
+    inventory = await db.get_user_inventory(user_id)
+    now = datetime.now()
+    feed_name = chicken_feed_name()
+
+    if not chicken:
+        text = "🐔 <b>Курица не найдена</b>\n\nОткрой курятник заново."
+        return text, InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="⬅️ Назад", callback_data=FarmCallback(action="chicken_coop", owner_id=user_id).pack())
+        ]])
+
+    state = chicken.get("state")
+    buttons = []
+
+    if state == "ready":
+        status = "🥚 Яйцо готово"
+        details = (
+            "<b>Награда:</b>\n"
+            "🥚 +1 яйцо\n"
+            f"⭐ +{EGG_XP_PER_ITEM} XP"
+        )
+        buttons.append([InlineKeyboardButton(
+            text="🥚 Собрать",
+            callback_data=ChickenCallback(action="collect", owner_id=user_id, chicken_num=chicken_num).pack(),
+        )])
+    elif state == "producing":
+        ready_time = chicken.get("ready_time")
+        left = format_time_delta(ready_time - now) if ready_time else "скоро"
+        status = "⏳ Производит яйцо"
+        details = f"<b>До готовности:</b>\n{left}"
+    else:
+        status = "🍽 Требуется корм"
+        details = (
+            f"Корм: <b>{inventory.get(CHICKEN_FEED_ITEM_ID, 0)}</b> {feed_name}\n"
+            f"Нужно: <b>{CHICKEN_FEED_COST}</b> {feed_name}"
+        )
+        buttons.append([InlineKeyboardButton(
+            text="🍽 Покормить",
+            callback_data=ChickenCallback(action="feed", owner_id=user_id, chicken_num=chicken_num).pack(),
+        )])
+
+    text = (
+        f"🐔 <b>Курица #{chicken_num}</b>\n\n"
+        f"Статус: <b>{status}</b>\n\n"
+        f"{details}"
+    )
+    buttons.append([InlineKeyboardButton(text="⬅️ Назад", callback_data=FarmCallback(action="chicken_coop", owner_id=user_id).pack())])
     return text, InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
@@ -656,30 +737,8 @@ async def cq_farm_chicken_coop(callback: CallbackQuery, callback_data: FarmCallb
 async def cq_farm_feed_chickens(callback: CallbackQuery, callback_data: FarmCallback, db: Database):
     if not await check_owner(callback, callback_data.owner_id):
         return
-    user_id = callback.from_user.id
-    farm = await db.get_user_farm_data(user_id)
-    timer_end = farm.get("chicken_timer_end")
-    now = datetime.now()
-
-    if timer_end and now < timer_end:
-        await callback.answer("Куры уже накормлены. Ждём яйца.", show_alert=True)
-        return
-    if timer_end and now >= timer_end:
-        await callback.answer("Сначала собери готовые яйца.", show_alert=True)
-        return
-
-    inventory = await db.get_user_inventory(user_id)
-    if inventory.get(WHEAT_ID, 0) < CHICKEN_FEED_COST:
-        await callback.answer(f"Нужно {CHICKEN_FEED_COST} 🌾 пшеницы для корма.", show_alert=True)
-        return
-
-    if not await db.modify_inventory(user_id, WHEAT_ID, -CHICKEN_FEED_COST):
-        await callback.answer("Не получилось списать пшеницу.", show_alert=True)
-        return
-
-    await db.set_chicken_timer(user_id, now + timedelta(minutes=EGG_PRODUCTION_MINUTES))
-    await callback.answer(f"Куры накормлены. Яйца будут через {EGG_PRODUCTION_MINUTES} мин.")
-    text, keyboard = await get_chicken_coop_menu(user_id, db)
+    await callback.answer("Теперь каждая курица кормится отдельно.", show_alert=True)
+    text, keyboard = await get_chicken_coop_menu(callback.from_user.id, db)
     await edit_farm_message(callback, text, keyboard)
 
 
@@ -687,27 +746,75 @@ async def cq_farm_feed_chickens(callback: CallbackQuery, callback_data: FarmCall
 async def cq_farm_collect_eggs(callback: CallbackQuery, callback_data: FarmCallback, db: Database):
     if not await check_owner(callback, callback_data.owner_id):
         return
-    user_id = callback.from_user.id
-    farm = await db.get_user_farm_data(user_id)
-    chicken_count = farm.get("chicken_count") or CHICKEN_COUNT
-    timer_end = farm.get("chicken_timer_end")
-    now = datetime.now()
+    await callback.answer("Теперь яйца собираются с каждой курицы отдельно.", show_alert=True)
+    text, keyboard = await get_chicken_coop_menu(callback.from_user.id, db)
+    await edit_farm_message(callback, text, keyboard)
 
-    if not timer_end or now < timer_end:
-        await callback.answer("Яйца ещё не готовы.", show_alert=True)
+
+@farm_router.callback_query(ChickenCallback.filter(F.action == "view"))
+async def cq_chicken_view(callback: CallbackQuery, callback_data: ChickenCallback, db: Database):
+    if not await check_owner(callback, callback_data.owner_id):
+        return
+    text, keyboard = await get_chicken_card(callback.from_user.id, callback_data.chicken_num, db)
+    await edit_farm_message(callback, text, keyboard)
+    await callback.answer()
+
+
+@farm_router.callback_query(ChickenCallback.filter(F.action == "feed"))
+async def cq_chicken_feed(callback: CallbackQuery, callback_data: ChickenCallback, db: Database):
+    if not await check_owner(callback, callback_data.owner_id):
+        return
+    user_id = callback.from_user.id
+    chicken = await db.get_user_chicken(user_id, callback_data.chicken_num)
+    if not chicken:
+        await callback.answer("Курица не найдена.", show_alert=True)
+        return
+    if chicken.get("state") != "needs_feed":
+        await callback.answer("Эту курицу сейчас нельзя кормить.", show_alert=True)
         return
 
     inventory = await db.get_user_inventory(user_id)
-    if storage_used(inventory, BARN_ITEMS) + chicken_count > BARN_CAPACITY:
-        await callback.answer("В амбаре нет места для яиц.", show_alert=True)
+    if inventory.get(CHICKEN_FEED_ITEM_ID, 0) < CHICKEN_FEED_COST:
+        await callback.answer(f"Нужно {CHICKEN_FEED_COST} {chicken_feed_name()}.", show_alert=True)
+        return
+    if not await db.modify_inventory(user_id, CHICKEN_FEED_ITEM_ID, -CHICKEN_FEED_COST):
+        await callback.answer("Не получилось списать корм.", show_alert=True)
         return
 
-    await db.modify_inventory(user_id, EGG_ID, chicken_count)
-    xp_amount = chicken_count * EGG_XP_PER_ITEM
-    _, level_alert = await add_xp_and_get_alert(db, user_id, xp_amount, "egg_collect")
-    await db.clear_chicken_timer(user_id)
-    await callback.answer(f"Собрано: +{chicken_count} 🥚 яиц\n+{xp_amount} XP{level_alert}", show_alert=True)
-    text, keyboard = await get_chicken_coop_menu(user_id, db)
+    ready_time = datetime.now() + timedelta(minutes=EGG_PRODUCTION_MINUTES)
+    if not await db.feed_chicken(user_id, callback_data.chicken_num, ready_time):
+        await db.modify_inventory(user_id, CHICKEN_FEED_ITEM_ID, CHICKEN_FEED_COST)
+        await callback.answer("Эту курицу сейчас нельзя кормить.", show_alert=True)
+        return
+
+    await callback.answer(f"Курица #{callback_data.chicken_num} накормлена.")
+    text, keyboard = await get_chicken_card(user_id, callback_data.chicken_num, db)
+    await edit_farm_message(callback, text, keyboard)
+
+
+@farm_router.callback_query(ChickenCallback.filter(F.action == "collect"))
+async def cq_chicken_collect(callback: CallbackQuery, callback_data: ChickenCallback, db: Database):
+    if not await check_owner(callback, callback_data.owner_id):
+        return
+    user_id = callback.from_user.id
+    chicken = await db.get_user_chicken(user_id, callback_data.chicken_num)
+    if not chicken or chicken.get("state") != "ready":
+        await callback.answer("У этой курицы яйцо ещё не готово.", show_alert=True)
+        return
+
+    inventory = await db.get_user_inventory(user_id)
+    if storage_used(inventory, BARN_ITEMS) + 1 > BARN_CAPACITY:
+        await callback.answer("В амбаре нет места для яйца.", show_alert=True)
+        return
+
+    if not await db.collect_chicken_egg(user_id, callback_data.chicken_num):
+        await callback.answer("Не получилось собрать яйцо.", show_alert=True)
+        return
+
+    await db.modify_inventory(user_id, EGG_ID, 1)
+    _, level_alert = await add_xp_and_get_alert(db, user_id, EGG_XP_PER_ITEM, "egg_collect")
+    await callback.answer(f"Собрано: +1 🥚 яйцо\n+{EGG_XP_PER_ITEM} XP{level_alert}", show_alert=True)
+    text, keyboard = await get_chicken_card(user_id, callback_data.chicken_num, db)
     await edit_farm_message(callback, text, keyboard)
 
 
