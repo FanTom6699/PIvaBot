@@ -2,6 +2,7 @@
 import asyncio
 import os
 from contextlib import suppress
+from html import escape
 import logging
 
 from aiogram import Router, F, Bot
@@ -109,6 +110,52 @@ async def cmd_download_db(message: Message):
             await message.answer(f"⚠️ Ошибка при отправке файла: {e}")
     else:
         await message.answer("⛔ Файл базы данных не найден!\nЯ искал в: /data/bot_database.db и bot_database.db")
+
+
+@admin_router.message(Command("getid"), IsAdmin())
+async def cmd_get_media_id(message: Message):
+    target = message.reply_to_message or message
+    lines = ["<b>ID из сообщения</b>"]
+
+    if target.sticker:
+        sticker = target.sticker
+        lines.extend([
+            "",
+            "<b>Стикер</b>",
+            f"file_id:\n<code>{escape(sticker.file_id)}</code>",
+            f"file_unique_id:\n<code>{escape(sticker.file_unique_id)}</code>",
+            f"type: <code>{escape(str(sticker.type))}</code>",
+        ])
+        if sticker.emoji:
+            lines.append(f"emoji: {escape(sticker.emoji)}")
+        if sticker.set_name:
+            lines.append(f"set_name: <code>{escape(sticker.set_name)}</code>")
+        custom_emoji_id = getattr(sticker, "custom_emoji_id", None)
+        if custom_emoji_id:
+            lines.append(f"custom_emoji_id:\n<code>{escape(custom_emoji_id)}</code>")
+
+    entities = list(target.entities or []) + list(target.caption_entities or [])
+    custom_emoji_entities = [
+        entity for entity in entities
+        if entity.type == "custom_emoji" and getattr(entity, "custom_emoji_id", None)
+    ]
+    if custom_emoji_entities:
+        lines.extend(["", "<b>Кастомные эмодзи</b>"])
+        seen = set()
+        for index, entity in enumerate(custom_emoji_entities, start=1):
+            custom_emoji_id = entity.custom_emoji_id
+            if custom_emoji_id in seen:
+                continue
+            seen.add(custom_emoji_id)
+            lines.append(f"{index}. <code>{escape(custom_emoji_id)}</code>")
+
+    if len(lines) == 1:
+        lines.extend([
+            "",
+            "Ответь командой <code>/getid</code> на сообщение со стикером или кастомным эмодзи.",
+        ])
+
+    await message.answer("\n".join(lines), parse_mode="HTML")
 
 # --- Callbacks: Главное меню ---
 
