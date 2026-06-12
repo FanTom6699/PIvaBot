@@ -21,6 +21,7 @@ from .common import (
 from .farm_config import (
     BARN_CAPACITY,
     BARN_ITEMS,
+    CHICKEN_BUY_COSTS,
     CHICKEN_COUNT,
     CHICKEN_FEED_COST,
     CHICKEN_FEED_ITEM_ID,
@@ -138,6 +139,10 @@ def can_complete_order(order: dict, inventory: dict) -> bool:
 
 def chicken_feed_name() -> str:
     return FARM_ITEM_NAMES.get(CHICKEN_FEED_ITEM_ID, CHICKEN_FEED_ITEM_ID)
+
+
+def next_chicken_cost(chicken_count: int) -> int | None:
+    return CHICKEN_BUY_COSTS.get(chicken_count + 1)
 
 
 def format_level_alert(old_xp: int, new_xp: int) -> str:
@@ -369,7 +374,47 @@ async def get_chicken_coop_menu(user_id: int, db: Database) -> tuple[str, Inline
             callback_data=ChickenCallback(action="view", owner_id=user_id, chicken_num=chicken_num).pack(),
         )])
 
+    buttons.append([InlineKeyboardButton(text="🏪 Магазин курятника", callback_data=FarmCallback(action="chicken_shop", owner_id=user_id).pack())])
     buttons.append([InlineKeyboardButton(text="⬅️ Назад", callback_data=FarmCallback(action="animals", owner_id=user_id).pack())])
+    return text, InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+async def get_chicken_shop_menu(user_id: int, db: Database) -> tuple[str, InlineKeyboardMarkup]:
+    farm = await db.get_user_farm_data(user_id)
+    chickens = await db.get_user_chickens(user_id)
+    chicken_count = len(chickens) or (farm.get("chicken_count") or CHICKEN_COUNT)
+    chicken_max_count = farm.get("chicken_max_count") or CHICKEN_MAX_COUNT
+    balance = await db.get_user_beer_rating(user_id)
+    cost = next_chicken_cost(chicken_count)
+
+    text = (
+        "🏪 <b>Магазин курятника</b>\n\n"
+        "Здесь можно докупить кур до лимита текущего этапа.\n\n"
+        f"{DIVIDER}\n"
+        f"🐔 Куры: <b>{chicken_count} / {chicken_max_count}</b>\n"
+        f"🍺 Баланс: <b>{balance}</b>\n"
+    )
+
+    buttons = []
+    if chicken_count >= chicken_max_count:
+        text += "\n<b>Лимит курятника достигнут.</b>"
+    elif cost is None:
+        text += "\nПокупка следующей курицы пока недоступна."
+    else:
+        next_number = chicken_count + 1
+        text += (
+            f"\nСледующая курица: <b>#{next_number}</b>\n"
+            f"Цена: <b>{cost}</b> 🍺"
+        )
+        if balance >= cost:
+            buttons.append([InlineKeyboardButton(
+                text=f"🐔 Купить курицу #{next_number} · {cost} 🍺",
+                callback_data=FarmCallback(action="buy_chicken", owner_id=user_id).pack(),
+            )])
+        else:
+            text += f"\n\n<i>Не хватает: {cost - balance} 🍺</i>"
+
+    buttons.append([InlineKeyboardButton(text="⬅️ Назад", callback_data=FarmCallback(action="chicken_coop", owner_id=user_id).pack())])
     return text, InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
@@ -731,6 +776,50 @@ async def cq_farm_chicken_coop(callback: CallbackQuery, callback_data: FarmCallb
     text, keyboard = await get_chicken_coop_menu(callback.from_user.id, db)
     await edit_farm_message(callback, text, keyboard)
     await callback.answer()
+
+
+@farm_router.callback_query(FarmCallback.filter(F.action == "chicken_shop"))
+async def cq_farm_chicken_shop(callback: CallbackQuery, callback_data: FarmCallback, db: Database):
+    if not await check_owner(callback, callback_data.owner_id):
+        return
+    text, keyboard = await get_chicken_shop_menu(callback.from_user.id, db)
+    await edit_farm_message(callback, text, keyboard)
+    await callback.answer()
+
+
+@farm_router.callback_query(FarmCallback.filter(F.action == "buy_chicken"))
+async def cq_farm_buy_chicken(callback: CallbackQuery, callback_data: FarmCallback, db: Database):
+    if not await check_owner(callback, callback_data.owner_id):
+        return
+    user_id = callback.from_user.id
+    farm = await db.get_user_farm_data(user_id)
+    chickens = await db.get_user_chickens(user_id)
+    chicken_count = len(chickens) or (farm.get("chicken_count") or CHICKEN_COUNT)
+    chicken_max_count = farm.get("chicken_max_count") or CHICKEN_MAX_COUNT
+    cost = next_chicken_cost(chicken_count)
+
+    if chicken_count >= chicken_max_count:
+        await callback.answer("Лимит курятника уже достигнут.", show_alert=True)
+        return
+    if cost is None:
+        await callback.answer("Покупка следующей курицы пока недоступна.", show_alert=True)
+        return
+
+    balance = await db.get_user_beer_rating(user_id)
+    if balance < cost:
+        await callback.answer(f"Не хватает {cost - balance} 🍺.", show_alert=True)
+        return
+
+    await db.change_rating(user_id, -cost)
+    new_chicken = await db.add_chicken(user_id)
+    if not new_chicken:
+        await db.change_rating(user_id, cost)
+        await callback.answer("Не получилось купить курицу.", show_alert=True)
+        return
+
+    await callback.answer(f"Куплена курица #{new_chicken}!")
+    text, keyboard = await get_chicken_shop_menu(user_id, db)
+    await edit_farm_message(callback, text, keyboard)
 
 
 @farm_router.callback_query(FarmCallback.filter(F.action == "feed_chickens"))

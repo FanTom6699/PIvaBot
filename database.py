@@ -68,12 +68,12 @@ class Database:
                     field_upgrade_timer_end TEXT,
                     brewery_upgrade_timer_end TEXT,
                     chicken_count INTEGER DEFAULT 2,
-                    chicken_max_count INTEGER DEFAULT 2,
+                    chicken_max_count INTEGER DEFAULT 6,
                     chicken_timer_end TEXT
                 )
             ''')
             await self._ensure_column(db, "user_farm_data", "chicken_count", "INTEGER DEFAULT 2")
-            await self._ensure_column(db, "user_farm_data", "chicken_max_count", "INTEGER DEFAULT 2")
+            await self._ensure_column(db, "user_farm_data", "chicken_max_count", "INTEGER DEFAULT 6")
             await self._ensure_column(db, "user_farm_data", "chicken_timer_end", "TEXT")
             await db.execute('''
                 CREATE TABLE IF NOT EXISTS user_chickens (
@@ -735,7 +735,7 @@ class Database:
         farm_row = await cursor.fetchone()
         chicken_count = (farm_row[0] if farm_row and farm_row[0] else CHICKEN_COUNT)
         chicken_max_count = (farm_row[1] if farm_row and len(farm_row) > 1 and farm_row[1] else CHICKEN_MAX_COUNT)
-        chicken_max_count = max(chicken_count, chicken_max_count)
+        chicken_max_count = max(chicken_count, chicken_max_count, CHICKEN_MAX_COUNT)
 
         await db.execute(
             "UPDATE user_farm_data SET chicken_count = ?, chicken_max_count = ? WHERE user_id = ?",
@@ -891,6 +891,37 @@ class Database:
             )
             await db.commit()
             return True
+
+    async def add_chicken(self, user_id: int) -> int | None:
+        async with aiosqlite.connect(self.db_name) as db:
+            await self._ensure_user_chickens(db, user_id)
+            cursor = await db.execute(
+                "SELECT chicken_count, chicken_max_count FROM user_farm_data WHERE user_id = ?",
+                (user_id,)
+            )
+            row = await cursor.fetchone()
+            if not row:
+                return None
+
+            chicken_count = row[0] or 0
+            chicken_max_count = row[1] or chicken_count
+            if chicken_count >= chicken_max_count:
+                return None
+
+            new_chicken_number = chicken_count + 1
+            await db.execute(
+                """
+                INSERT OR IGNORE INTO user_chickens (user_id, chicken_number, state, ready_time)
+                VALUES (?, ?, 'needs_feed', NULL)
+                """,
+                (user_id, new_chicken_number)
+            )
+            await db.execute(
+                "UPDATE user_farm_data SET chicken_count = ? WHERE user_id = ?",
+                (new_chicken_number, user_id)
+            )
+            await db.commit()
+            return new_chicken_number
 
     async def start_brewing(self, user_id: int, batch_size: int, end_time: datetime):
         async with aiosqlite.connect(self.db_name) as db:
