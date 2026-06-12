@@ -374,7 +374,6 @@ async def get_chicken_coop_menu(user_id: int, db: Database) -> tuple[str, Inline
             callback_data=ChickenCallback(action="view", owner_id=user_id, chicken_num=chicken_num).pack(),
         )])
 
-    buttons.append([InlineKeyboardButton(text="🏪 Магазин курятника", callback_data=FarmCallback(action="chicken_shop", owner_id=user_id).pack())])
     buttons.append([InlineKeyboardButton(text="⬅️ Назад", callback_data=FarmCallback(action="animals", owner_id=user_id).pack())])
     return text, InlineKeyboardMarkup(inline_keyboard=buttons)
 
