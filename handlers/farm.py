@@ -28,6 +28,7 @@ from .farm_config import (
     CHICKEN_MAX_COUNT,
     CROP_CODE_TO_ID,
     CROP_SHORT,
+    EGG_EMOJI,
     EGG_ID,
     EGG_PRODUCTION_MINUTES,
     EGG_XP_PER_ITEM,
@@ -355,7 +356,7 @@ async def get_chicken_coop_menu(user_id: int, db: Database) -> tuple[str, Inline
         state = chicken.get("state")
         text += f"🐔 <b>Курица #{chicken_num}</b>\n"
         if state == "ready":
-            status_line = "🥚 Яйцо готово"
+            status_line = f"{EGG_EMOJI} Яйцо готово"
         elif state == "producing":
             ready_time = chicken.get("ready_time")
             left = format_time_delta(ready_time - now) if ready_time else "скоро"
@@ -429,10 +430,10 @@ async def get_chicken_card(user_id: int, chicken_num: int, db: Database) -> tupl
     buttons = []
 
     if state == "ready":
-        status = "🥚 Яйцо готово"
+        status = f"{EGG_EMOJI} Яйцо готово"
         details = (
             "<b>Награда:</b>\n"
-            "🥚 +1 яйцо\n"
+            f"{EGG_EMOJI} +1 яйцо\n"
             f"⭐ +{EGG_XP_PER_ITEM} XP"
         )
         buttons.append([InlineKeyboardButton(

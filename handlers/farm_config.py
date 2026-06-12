@@ -2,6 +2,7 @@ import random
 
 WHEAT_ID = "пшеница"
 EGG_ID = "яйца"
+EGG_EMOJI = '<tg-emoji emoji-id="5283003846472277736">🥚</tg-emoji>'
 
 START_FIELD_COUNT = 6
 START_WHEAT_AMOUNT = 6
@@ -41,7 +42,7 @@ CROP_SHORT = {
 
 FARM_ITEM_NAMES = {
     WHEAT_ID: "🌾 Пшеница",
-    EGG_ID: "🥚 Яйца",
+    EGG_ID: f"{EGG_EMOJI} Яйца",
     "зерно": "🌾 Зерно",
     "хмель": "🍃 Хмель",
     "кукуруза": "🌽 Кукуруза",
@@ -53,7 +54,7 @@ SILO_ITEMS = [
 ]
 
 BARN_ITEMS = [
-    (EGG_ID, "🥚 Яйца"),
+    (EGG_ID, f"{EGG_EMOJI} Яйца"),
 ]
 
 BARN_BASE_CAPACITY = BARN_CAPACITY
