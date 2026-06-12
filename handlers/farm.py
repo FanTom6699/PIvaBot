@@ -336,7 +336,6 @@ async def get_chicken_coop_menu(user_id: int, db: Database) -> tuple[str, Inline
     chicken_count = len(chickens) or (farm.get("chicken_count") or CHICKEN_COUNT)
     chicken_max_count = farm.get("chicken_max_count") or CHICKEN_MAX_COUNT
     now = datetime.now()
-    ready_count = sum(1 for chicken in chickens if chicken.get("state") == "ready")
     barn_used = storage_used(inventory, BARN_ITEMS)
     feed_amount = inventory.get(CHICKEN_FEED_ITEM_ID, 0)
     feed_name = chicken_feed_name()
@@ -347,7 +346,6 @@ async def get_chicken_coop_menu(user_id: int, db: Database) -> tuple[str, Inline
         f"{DIVIDER}\n"
         f"🐔 Куры: <b>{chicken_count} / {chicken_max_count}</b>\n"
         f"🐔 Корм: <b>{feed_amount}</b> {feed_name}\n"
-        f"🥚 Готово яиц: <b>{ready_count}</b>\n"
         f"📦 Амбар: <b>{barn_used} / {BARN_CAPACITY}</b>\n\n"
     )
 
@@ -358,15 +356,13 @@ async def get_chicken_coop_menu(user_id: int, db: Database) -> tuple[str, Inline
         text += f"🐔 <b>Курица #{chicken_num}</b>\n"
         if state == "ready":
             status_line = "🥚 Яйцо готово"
-            button_text = f"🐔 #{chicken_num} · 🥚 готово"
         elif state == "producing":
             ready_time = chicken.get("ready_time")
             left = format_time_delta(ready_time - now) if ready_time else "скоро"
             status_line = f"⏳ До готовности: <b>{left}</b>"
-            button_text = f"🐔 #{chicken_num} · ⏳ {left}"
         else:
             status_line = "🍽 Требуется корм"
-            button_text = f"🐔 #{chicken_num} · 🍽 корм"
+        button_text = f"🐔 Курица #{chicken_num}"
 
         text += f"{status_line}\n\n"
         buttons.append([InlineKeyboardButton(
