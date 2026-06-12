@@ -170,7 +170,7 @@ async def get_farm_profile_status(user_id: int, db: Database, show_inventory: bo
     elif chicken_timer:
         chicken_status = f"яйца через {format_time_delta(chicken_timer - now)}"
     else:
-        chicken_status = "таймер не запущен"
+        chicken_status = "нужно покормить"
 
     silo_used = sum(max(0, int(inventory.get(item_id, 0))) for item_id, _ in SILO_ITEMS)
     barn_used = sum(max(0, int(inventory.get(item_id, 0))) for item_id, _ in BARN_ITEMS)

@@ -704,6 +704,14 @@ class Database:
             )
             await db.commit()
 
+    async def clear_chicken_timer(self, user_id: int):
+        async with aiosqlite.connect(self.db_name) as db:
+            await db.execute(
+                "UPDATE user_farm_data SET chicken_timer_end = NULL WHERE user_id = ?",
+                (user_id,)
+            )
+            await db.commit()
+
     async def start_brewing(self, user_id: int, batch_size: int, end_time: datetime):
         async with aiosqlite.connect(self.db_name) as db:
             await db.execute(
