@@ -2,16 +2,10 @@ import random
 
 WHEAT_ID = "пшеница"
 EGG_ID = "яйца"
-
-
-def custom_emoji(emoji_id: str, fallback: str) -> str:
-    return f'<tg-emoji emoji-id="{emoji_id}">{fallback}</tg-emoji>'
-
-
-WHEAT_EMOJI = custom_emoji("5281027628940172336", "🌾")
-EGG_EMOJI = custom_emoji("5283003846472277736", "🥚")
-CHICKEN_EMOJI = custom_emoji("5287452045316497268", "🐔")
-CHICKEN_FEED_EMOJI = custom_emoji("5283093740137781285", "🍽")
+WHEAT_EMOJI = "🌾"
+EGG_EMOJI = "🥚"
+CHICKEN_EMOJI = "🐔"
+CHICKEN_FEED_EMOJI = "🍽"
 
 START_FIELD_COUNT = 6
 START_WHEAT_AMOUNT = 6

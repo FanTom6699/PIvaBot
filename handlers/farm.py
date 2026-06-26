@@ -183,15 +183,12 @@ async def edit_farm_message(callback: CallbackQuery, text: str, keyboard: Inline
 
 
 async def get_farm_dashboard(user_id: int, user_name: str, db: Database, show_main_menu: bool = True) -> tuple[str, InlineKeyboardMarkup]:
-    inventory = await db.get_user_inventory(user_id)
     active_plots = await db.get_user_plots(user_id)
     now = datetime.now()
     counts = get_plot_counts(active_plots, now)
 
     xp = await db.get_user_xp(user_id)
     level, title = get_xp_level(xp)
-    silo_used = storage_used(inventory, SILO_ITEMS)
-    barn_used = storage_used(inventory, BARN_ITEMS)
 
     text = (
         f"{WHEAT_EMOJI} <b>Ферма</b>\n\n"
@@ -202,22 +199,15 @@ async def get_farm_dashboard(user_id: int, user_name: str, db: Database, show_ma
         f"Поля: <b>{counts['total']}</b>\n"
         f"Свободно: <b>{counts['free']}</b>\n"
         f"Растёт: <b>{counts['growing']}</b>\n"
-        f"Готово: <b>{counts['ready']}</b>\n\n"
-        f"{WHEAT_EMOJI} Силос: <b>{silo_used} / {SILO_CAPACITY}</b>\n"
-        f"📦 Амбар: <b>{barn_used} / {BARN_CAPACITY}</b>"
+        f"Готово: <b>{counts['ready']}</b>"
     )
 
     keyboard_rows = [
         [
             InlineKeyboardButton(text="🌱 Поля", callback_data=FarmCallback(action="view_plots", owner_id=user_id).pack()),
-            InlineKeyboardButton(text="🐔 Животные", callback_data=FarmCallback(action="animals", owner_id=user_id).pack()),
-        ],
-        [
             InlineKeyboardButton(text="🏭 Производство", callback_data=FarmCallback(action="production", owner_id=user_id).pack()),
-            InlineKeyboardButton(text="📦 Амбар", callback_data=FarmCallback(action="barn", owner_id=user_id).pack()),
         ],
         [
-            InlineKeyboardButton(text="🌾 Силос", callback_data=FarmCallback(action="silo", owner_id=user_id).pack()),
             InlineKeyboardButton(text="🚚 Заказы", callback_data=FarmCallback(action="orders_menu", owner_id=user_id).pack()),
         ],
     ]
@@ -243,7 +233,7 @@ async def get_plots_dashboard(user_id: int, db: Database) -> tuple[str, InlineKe
         f"Посадка: <b>{WHEAT_PLANT_COST}</b> {WHEAT_EMOJI} пшеница\n"
         f"Рост: <b>{WHEAT_GROW_MINUTES} мин.</b>\n"
         f"Сбор: <b>+{WHEAT_HARVEST_AMOUNT}</b> {WHEAT_EMOJI} пшеницы и <b>+{WHEAT_HARVEST_AMOUNT * WHEAT_XP_PER_ITEM}</b> XP\n"
-        f"В силосе: <b>{inventory.get(WHEAT_ID, 0)}</b> {WHEAT_EMOJI}"
+        f"Запас пшеницы: <b>{inventory.get(WHEAT_ID, 0)}</b> {WHEAT_EMOJI}"
     )
 
     buttons = []
@@ -618,6 +608,17 @@ async def cq_farm_main_dashboard(callback: CallbackQuery, callback_data: FarmCal
     await callback.answer()
 
 
+async def show_hidden_farm_section(callback: CallbackQuery, db: Database):
+    text, keyboard = await get_farm_dashboard(
+        callback.from_user.id,
+        callback.from_user.full_name,
+        db,
+        show_main_menu=callback.message.chat.type == "private",
+    )
+    await edit_farm_message(callback, text, keyboard)
+    await callback.answer("Этот раздел временно убран. Ферму переделаем отдельно.", show_alert=True)
+
+
 @farm_router.callback_query(FarmCallback.filter(F.action == "main_menu"))
 async def cq_farm_main_menu(callback: CallbackQuery, callback_data: FarmCallback):
     if not await check_owner(callback, callback_data.owner_id):
@@ -771,165 +772,77 @@ async def cq_plot_time(callback: CallbackQuery, callback_data: PlotCallback):
 async def cq_farm_animals(callback: CallbackQuery, callback_data: FarmCallback, db: Database):
     if not await check_owner(callback, callback_data.owner_id):
         return
-    text, keyboard = get_animals_menu(callback.from_user.id)
-    await edit_farm_message(callback, text, keyboard)
-    await callback.answer()
+    await show_hidden_farm_section(callback, db)
 
 
 @farm_router.callback_query(FarmCallback.filter(F.action == "chicken_coop"))
 async def cq_farm_chicken_coop(callback: CallbackQuery, callback_data: FarmCallback, db: Database):
     if not await check_owner(callback, callback_data.owner_id):
         return
-    text, keyboard = await get_chicken_coop_menu(callback.from_user.id, db)
-    await edit_farm_message(callback, text, keyboard)
-    await callback.answer()
+    await show_hidden_farm_section(callback, db)
 
 
 @farm_router.callback_query(FarmCallback.filter(F.action == "chicken_shop"))
 async def cq_farm_chicken_shop(callback: CallbackQuery, callback_data: FarmCallback, db: Database):
     if not await check_owner(callback, callback_data.owner_id):
         return
-    text, keyboard = await get_chicken_shop_menu(callback.from_user.id, db)
-    await edit_farm_message(callback, text, keyboard)
-    await callback.answer()
+    await show_hidden_farm_section(callback, db)
 
 
 @farm_router.callback_query(FarmCallback.filter(F.action == "buy_chicken"))
 async def cq_farm_buy_chicken(callback: CallbackQuery, callback_data: FarmCallback, db: Database):
     if not await check_owner(callback, callback_data.owner_id):
         return
-    user_id = callback.from_user.id
-    farm = await db.get_user_farm_data(user_id)
-    chickens = await db.get_user_chickens(user_id)
-    chicken_count = len(chickens) or (farm.get("chicken_count") or CHICKEN_COUNT)
-    chicken_max_count = farm.get("chicken_max_count") or CHICKEN_MAX_COUNT
-    cost = next_chicken_cost(chicken_count)
-
-    if chicken_count >= chicken_max_count:
-        await callback.answer("Лимит курятника уже достигнут.", show_alert=True)
-        return
-    if cost is None:
-        await callback.answer("Покупка следующей курицы пока недоступна.", show_alert=True)
-        return
-
-    balance = await db.get_user_beer_rating(user_id)
-    if balance < cost:
-        await callback.answer(f"Не хватает {cost - balance} 🍺.", show_alert=True)
-        return
-
-    await db.change_rating(user_id, -cost)
-    new_chicken = await db.add_chicken(user_id)
-    if not new_chicken:
-        await db.change_rating(user_id, cost)
-        await callback.answer("Не получилось купить курицу.", show_alert=True)
-        return
-
-    await callback.answer(f"Куплена курица #{new_chicken}!")
-    text, keyboard = await get_chicken_shop_menu(user_id, db)
-    await edit_farm_message(callback, text, keyboard)
+    await show_hidden_farm_section(callback, db)
 
 
 @farm_router.callback_query(FarmCallback.filter(F.action == "feed_chickens"))
 async def cq_farm_feed_chickens(callback: CallbackQuery, callback_data: FarmCallback, db: Database):
     if not await check_owner(callback, callback_data.owner_id):
         return
-    await callback.answer("Теперь каждая курица кормится отдельно.", show_alert=True)
-    text, keyboard = await get_chicken_coop_menu(callback.from_user.id, db)
-    await edit_farm_message(callback, text, keyboard)
+    await show_hidden_farm_section(callback, db)
 
 
 @farm_router.callback_query(FarmCallback.filter(F.action == "collect_eggs"))
 async def cq_farm_collect_eggs(callback: CallbackQuery, callback_data: FarmCallback, db: Database):
     if not await check_owner(callback, callback_data.owner_id):
         return
-    await callback.answer("Теперь яйца собираются с каждой курицы отдельно.", show_alert=True)
-    text, keyboard = await get_chicken_coop_menu(callback.from_user.id, db)
-    await edit_farm_message(callback, text, keyboard)
+    await show_hidden_farm_section(callback, db)
 
 
 @farm_router.callback_query(ChickenCallback.filter(F.action == "view"))
 async def cq_chicken_view(callback: CallbackQuery, callback_data: ChickenCallback, db: Database):
     if not await check_owner(callback, callback_data.owner_id):
         return
-    text, keyboard = await get_chicken_card(callback.from_user.id, callback_data.chicken_num, db)
-    await edit_farm_message(callback, text, keyboard)
-    await callback.answer()
+    await show_hidden_farm_section(callback, db)
 
 
 @farm_router.callback_query(ChickenCallback.filter(F.action == "feed"))
 async def cq_chicken_feed(callback: CallbackQuery, callback_data: ChickenCallback, db: Database):
     if not await check_owner(callback, callback_data.owner_id):
         return
-    user_id = callback.from_user.id
-    chicken = await db.get_user_chicken(user_id, callback_data.chicken_num)
-    if not chicken:
-        await callback.answer("Курица не найдена.", show_alert=True)
-        return
-    if chicken.get("state") != "needs_feed":
-        await callback.answer("Эту курицу сейчас нельзя кормить.", show_alert=True)
-        return
-
-    inventory = await db.get_user_inventory(user_id)
-    if inventory.get(CHICKEN_FEED_ITEM_ID, 0) < CHICKEN_FEED_COST:
-        await callback.answer(f"Нужно {CHICKEN_FEED_COST} {chicken_feed_plain_name()}.", show_alert=True)
-        return
-    if not await db.modify_inventory(user_id, CHICKEN_FEED_ITEM_ID, -CHICKEN_FEED_COST):
-        await callback.answer("Не получилось списать корм.", show_alert=True)
-        return
-
-    ready_time = datetime.now() + timedelta(minutes=EGG_PRODUCTION_MINUTES)
-    if not await db.feed_chicken(user_id, callback_data.chicken_num, ready_time):
-        await db.modify_inventory(user_id, CHICKEN_FEED_ITEM_ID, CHICKEN_FEED_COST)
-        await callback.answer("Эту курицу сейчас нельзя кормить.", show_alert=True)
-        return
-
-    await callback.answer(f"Курица #{callback_data.chicken_num} накормлена.")
-    text, keyboard = await get_chicken_card(user_id, callback_data.chicken_num, db)
-    await edit_farm_message(callback, text, keyboard)
+    await show_hidden_farm_section(callback, db)
 
 
 @farm_router.callback_query(ChickenCallback.filter(F.action == "collect"))
 async def cq_chicken_collect(callback: CallbackQuery, callback_data: ChickenCallback, db: Database):
     if not await check_owner(callback, callback_data.owner_id):
         return
-    user_id = callback.from_user.id
-    chicken = await db.get_user_chicken(user_id, callback_data.chicken_num)
-    if not chicken or chicken.get("state") != "ready":
-        await callback.answer("У этой курицы яйцо ещё не готово.", show_alert=True)
-        return
-
-    inventory = await db.get_user_inventory(user_id)
-    if storage_used(inventory, BARN_ITEMS) + 1 > BARN_CAPACITY:
-        await callback.answer("В амбаре нет места для яйца.", show_alert=True)
-        return
-
-    if not await db.collect_chicken_egg(user_id, callback_data.chicken_num):
-        await callback.answer("Не получилось собрать яйцо.", show_alert=True)
-        return
-
-    await db.modify_inventory(user_id, EGG_ID, 1)
-    _, level_alert = await add_xp_and_get_alert(db, user_id, EGG_XP_PER_ITEM, "egg_collect")
-    await callback.answer(f"Собрано: +1 🥚 яйцо\n+{EGG_XP_PER_ITEM} XP{level_alert}", show_alert=True)
-    text, keyboard = await get_chicken_card(user_id, callback_data.chicken_num, db)
-    await edit_farm_message(callback, text, keyboard)
+    await show_hidden_farm_section(callback, db)
 
 
 @farm_router.callback_query(FarmCallback.filter(F.action == "barn"))
 async def cq_farm_barn(callback: CallbackQuery, callback_data: FarmCallback, db: Database):
     if not await check_owner(callback, callback_data.owner_id):
         return
-    text, keyboard = await get_barn_menu(callback.from_user.id, db)
-    await edit_farm_message(callback, text, keyboard)
-    await callback.answer()
+    await show_hidden_farm_section(callback, db)
 
 
 @farm_router.callback_query(FarmCallback.filter(F.action == "silo"))
 async def cq_farm_silo(callback: CallbackQuery, callback_data: FarmCallback, db: Database):
     if not await check_owner(callback, callback_data.owner_id):
         return
-    text, keyboard = await get_silo_menu(callback.from_user.id, db)
-    await edit_farm_message(callback, text, keyboard)
-    await callback.answer()
+    await show_hidden_farm_section(callback, db)
 
 
 @farm_router.callback_query(FarmCallback.filter(F.action == "production"))
