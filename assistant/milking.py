@@ -73,6 +73,13 @@ class MilkingController:
             if button:
                 self.phase = "milk_button"
                 await self.navigator.execute({"action": "click", "button": button.text})
+                return True
+            button = self._find_milk_button(buttons)
+            if button:
+                self.phase = "milking_result"
+                await self.navigator.execute({"action": "click", "button": button.text})
+                return True
+            logger.warning("Milk+ or milk button was not found. Buttons: %s", self._button_labels(buttons))
             return True
 
         if self.phase == "milk_button":
@@ -80,6 +87,8 @@ class MilkingController:
             if button:
                 self.phase = "milking_result"
                 await self.navigator.execute({"action": "click", "button": button.text})
+            else:
+                logger.warning("Milk button was not found. Buttons: %s", self._button_labels(buttons))
             return True
 
         if self.phase == "milking_result":
@@ -161,6 +170,8 @@ class MilkingController:
     def _find_milk_plus(buttons: list[ButtonInfo]) -> ButtonInfo | None:
         for button in buttons:
             label = button.text.casefold()
+            if MilkingController._is_milk_button_label(label):
+                continue
             if (
                 "\u043c\u043e\u043b\u043e\u043a\u043e+" in label
                 or "x2" in label
@@ -174,9 +185,14 @@ class MilkingController:
     def _find_milk_button(buttons: list[ButtonInfo]) -> ButtonInfo | None:
         for button in buttons:
             label = button.text.casefold()
-            if "\u043f\u043e\u0434\u043e\u0438\u0442\u044c" in label or label.strip() == "\u0434\u043e\u0438\u0442\u044c":
+            if MilkingController._is_milk_button_label(label):
                 return button
         return None
+
+    @staticmethod
+    def _is_milk_button_label(label: str) -> bool:
+        normalized = label.strip()
+        return "\u043f\u043e\u0434\u043e\u0438\u0442\u044c" in normalized or "\u0434\u043e\u0438\u0442\u044c" in normalized
 
     @staticmethod
     def _find_back(buttons: list[ButtonInfo]) -> ButtonInfo | None:
@@ -194,3 +210,7 @@ class MilkingController:
         return "\u043c\u043e\u043b\u043e\u043a" in lower and any(
             word in lower for word in ("\u043f\u043e\u043b\u0443\u0447", "\u0443\u0441\u043f\u0435\u0448", "+", "x2", "\u00d72")
         )
+
+    @staticmethod
+    def _button_labels(buttons: list[ButtonInfo]) -> list[str]:
+        return [button.text for button in buttons]
