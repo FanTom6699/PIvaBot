@@ -41,7 +41,12 @@ class AssistantApp:
             asyncio.to_thread(load_json_file, self.config.rules_path),
         )
         self.llm = build_llm(self.config.openai_api_key, self.config.openai_model, recipes, rules)
-        self.navigator = Navigator(self.telegram, self.db, dry_run=self.config.dry_run)
+        self.navigator = Navigator(
+            self.telegram,
+            self.db,
+            dry_run=self.config.dry_run,
+            action_delay_seconds=self.config.action_delay_seconds,
+        )
         self.milking = MilkingController(self.navigator, self.db, enabled=self.config.milking_enabled)
         self.scheduler = Scheduler(
             self.db,

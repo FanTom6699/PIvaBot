@@ -49,7 +49,7 @@ class MilkingController:
             return True
 
         if self.phase == "cooldown":
-            return False
+            return True
 
         buttons = parsed.buttons
         cleanup = self._find_cleanup_button(buttons)
@@ -66,6 +66,8 @@ class MilkingController:
 
         if self.phase == "await_main":
             if parsed.food_percent is None:
+                logger.info("Food percent was not found; refreshing main menu")
+                await self._send_command("\u043c\u0443\u043a")
                 return True
             if parsed.food_percent < 99:
                 self.phase = "food_menu"
@@ -85,8 +87,9 @@ class MilkingController:
         if self.phase == "after_grass":
             back = self._find_back(buttons)
             if back:
-                self.phase = "await_main"
                 await self.navigator.execute({"action": "click", "button": back.text})
+                self.phase = "await_main"
+                await self._send_command("\u043c\u0443\u043a")
             return True
 
         if self.phase == "milk_plus":
@@ -150,7 +153,7 @@ class MilkingController:
         if button:
             await self.navigator.execute({"action": "click", "button": button.text})
         else:
-            logger.warning("Food menu button was not found; waiting for a fresh message")
+            logger.warning("Food menu button was not found. Buttons: %s", self._button_labels(buttons))
 
     async def _click_milk_plus(self, buttons: list[ButtonInfo]) -> None:
         button = self._find_milk_plus(buttons)
@@ -170,7 +173,8 @@ class MilkingController:
         # non-milking button in the menu's visual order.
         excluded = ("\u043d\u0430\u0437\u0430\u0434", "\u0434\u043e\u0438\u0442\u044c", "\u043f\u043e\u0434\u043e\u0438\u0442\u044c", "\u043c\u043e\u043b\u043e\u043a\u043e")
         for button in sorted(buttons, key=lambda item: (item.row, item.col)):
-            if not any(word in button.text.casefold() for word in excluded):
+            label = button.text.casefold()
+            if not any(word in label for word in excluded) and not MilkingController._is_timer_label(label):
                 return button
         return None
 
@@ -183,7 +187,8 @@ class MilkingController:
 
         excluded = ("\u043d\u0430\u0437\u0430\u0434", "\u0441\u0443\u043f", "\u0431\u0440\u043e\u043a", "\u0448\u0435\u0439\u043a", "\u043c\u043e\u043b\u043e\u043a\u043e")
         for button in sorted(buttons, key=lambda item: (item.row, item.col)):
-            if not any(word in button.text.casefold() for word in excluded):
+            label = button.text.casefold()
+            if not any(word in label for word in excluded) and not MilkingController._is_timer_label(label):
                 return button
         return None
 
@@ -222,6 +227,19 @@ class MilkingController:
     def _is_milk_button_label(label: str) -> bool:
         normalized = label.strip()
         return "\u043f\u043e\u0434\u043e\u0438\u0442\u044c" in normalized or "\u0434\u043e\u0438\u0442\u044c" in normalized
+
+    @staticmethod
+    def _is_timer_label(label: str) -> bool:
+        has_digit = any(char.isdigit() for char in label)
+        timer_words = (
+            "\u043c\u0438\u043d",
+            "\u043c\u0438\u043d\u0443\u0442",
+            "\u0441\u0435\u043a",
+            "\u0447\u0430\u0441",
+            "\u043a\u0434",
+            "\u0442\u0430\u0439\u043c\u0435\u0440",
+        )
+        return has_digit and any(word in label for word in timer_words)
 
     @staticmethod
     def _find_back(buttons: list[ButtonInfo]) -> ButtonInfo | None:

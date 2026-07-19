@@ -33,6 +33,7 @@ class AssistantConfig:
     loop_interval_seconds: int
     max_history_messages: int
     milking_enabled: bool
+    action_delay_seconds: float
 
     @classmethod
     def from_env(cls) -> "AssistantConfig":
@@ -58,4 +59,5 @@ class AssistantConfig:
             loop_interval_seconds=int(os.getenv("LOOP_INTERVAL_SECONDS", "5")),
             max_history_messages=int(os.getenv("MAX_HISTORY_MESSAGES", "20")),
             milking_enabled=_bool_env("MILKING_ENABLED", True),
+            action_delay_seconds=float(os.getenv("ACTION_DELAY_SECONDS", "1.5")),
         )
