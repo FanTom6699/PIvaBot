@@ -90,6 +90,19 @@ class Navigator:
             raise RuntimeError(f"Button not found: {button_text}")
         await message.click(button.row, button.col)
 
+    async def click_current_button(self, button: ButtonInfo) -> None:
+        if not self.last_message:
+            raise RuntimeError(f"Current message is not available for button: {button.text}")
+        logger.info("Action: %s", {"action": "click", "button": button.text, "row": button.row, "col": button.col})
+        if self.dry_run:
+            await self.db.add_action("click", {"button": button.text, "row": button.row, "col": button.col}, "dry_run")
+            logger.info("DRY_RUN enabled, action was not sent.")
+            return
+        await self._wait_before_action()
+        await self.last_message.click(button.row, button.col)
+        await self.db.add_action("click", {"button": button.text, "row": button.row, "col": button.col}, "clicked")
+        self._last_action_at = time.monotonic()
+
     async def open_menu(self, menu: str) -> None:
         try:
             await self.click_button(menu)

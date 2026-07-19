@@ -118,8 +118,8 @@ def parse_account(text: str) -> dict[str, Any]:
 
 def parse_food_percent(text: str) -> int | None:
     pattern = (
-        r"(?:\u0445\u0430\u0432\u0447\u0438\u043a|\u0441\u044b\u0442\u043e\u0441\u0442\u044c|"
-        r"\u0435\u0434\u0430|food)[^\d]{0,24}(?P<percent>\d{1,3})\s*%?"
+        r"(?:\u0445\u0430\u0432\w*|\u0441\u044b\u0442\w*|\u0433\u043e\u043b\u043e\u0434\w*|"
+        r"\u0435\u0434\u0430|food)[^\d]{0,40}(?P<percent>\d{1,3})\s*%?"
     )
     match = re.search(pattern, text, re.IGNORECASE)
     if not match:

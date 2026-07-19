@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta
+import time
 
 from telethon.tl.custom import Message
 
@@ -24,6 +25,7 @@ class MilkingController:
         self.db = db
         self.enabled = enabled
         self.phase = "idle"
+        self._last_menu_refresh_at = 0.0
 
     async def start(self) -> None:
         if not self.enabled:
@@ -42,6 +44,14 @@ class MilkingController:
         if not self.enabled or self.phase == "idle":
             return False
 
+        logger.info(
+            "Milking phase=%s food=%s cooldown=%s buttons=%s",
+            self.phase,
+            parsed.food_percent,
+            parsed.milking_cooldown_seconds,
+            self._button_labels(parsed.buttons),
+        )
+
         if parsed.milking_cooldown_seconds:
             await self._save_cooldown(parsed.milking_cooldown_seconds)
             self.phase = "cooldown"
@@ -55,7 +65,7 @@ class MilkingController:
         cleanup = self._find_cleanup_button(buttons)
         if cleanup:
             phase_before_cleanup = self.phase
-            await self.navigator.execute({"action": "click", "button": cleanup.text})
+            await self.navigator.click_current_button(cleanup)
             if phase_before_cleanup == "milking_result":
                 await self._save_cooldown(self.COOLDOWN_SECONDS)
                 self.phase = "cooldown"
@@ -66,8 +76,7 @@ class MilkingController:
 
         if self.phase == "await_main":
             if parsed.food_percent is None:
-                logger.info("Food percent was not found; refreshing main menu")
-                await self._send_command("\u043c\u0443\u043a")
+                await self._refresh_main_menu("Food percent was not found")
                 return True
             if parsed.food_percent < 99:
                 self.phase = "food_menu"
@@ -81,27 +90,31 @@ class MilkingController:
             grass = self._find_grass(buttons)
             if grass:
                 self.phase = "after_grass"
-                await self.navigator.execute({"action": "click", "button": grass.text})
+                await self.navigator.click_current_button(grass)
+            else:
+                logger.warning("Grass button was not found. Buttons: %s", self._button_labels(buttons))
             return True
 
         if self.phase == "after_grass":
             back = self._find_back(buttons)
             if back:
-                await self.navigator.execute({"action": "click", "button": back.text})
+                await self.navigator.click_current_button(back)
                 self.phase = "await_main"
                 await self._send_command("\u043c\u0443\u043a")
+            else:
+                logger.warning("Back button was not found. Buttons: %s", self._button_labels(buttons))
             return True
 
         if self.phase == "milk_plus":
             button = self._find_milk_plus(buttons)
             if button:
                 self.phase = "milk_button"
-                await self.navigator.execute({"action": "click", "button": button.text})
+                await self.navigator.click_current_button(button)
                 return True
             button = self._find_milk_button(buttons)
             if button:
                 self.phase = "milking_result"
-                await self.navigator.execute({"action": "click", "button": button.text})
+                await self.navigator.click_current_button(button)
                 return True
             logger.warning("Milk+ or milk button was not found. Buttons: %s", self._button_labels(buttons))
             return True
@@ -110,7 +123,7 @@ class MilkingController:
             button = self._find_milk_button(buttons)
             if button:
                 self.phase = "milking_result"
-                await self.navigator.execute({"action": "click", "button": button.text})
+                await self.navigator.click_current_button(button)
             else:
                 logger.warning("Milk button was not found. Buttons: %s", self._button_labels(buttons))
             return True
@@ -133,6 +146,7 @@ class MilkingController:
             await self.db.complete_timer(self.COOLDOWN_KEY)
             self.phase = "await_main"
             await self._send_command("\u043c\u0443\u043a")
+            self._last_menu_refresh_at = time.monotonic()
             logger.info("Milking cooldown finished; checking food again")
             break
 
@@ -148,17 +162,26 @@ class MilkingController:
     async def _send_command(self, text: str) -> None:
         await self.navigator.execute({"action": "message", "text": text})
 
+    async def _refresh_main_menu(self, reason: str) -> None:
+        now = time.monotonic()
+        if now - self._last_menu_refresh_at < 8:
+            logger.info("%s; waiting for menu update", reason)
+            return
+        logger.info("%s; refreshing main menu", reason)
+        self._last_menu_refresh_at = now
+        await self._send_command("\u043c\u0443\u043a")
+
     async def _click_food_menu(self, buttons: list[ButtonInfo]) -> None:
         button = self._find_food_menu(buttons)
         if button:
-            await self.navigator.execute({"action": "click", "button": button.text})
+            await self.navigator.click_current_button(button)
         else:
             logger.warning("Food menu button was not found. Buttons: %s", self._button_labels(buttons))
 
     async def _click_milk_plus(self, buttons: list[ButtonInfo]) -> None:
         button = self._find_milk_plus(buttons)
         if button:
-            await self.navigator.execute({"action": "click", "button": button.text})
+            await self.navigator.click_current_button(button)
         else:
             logger.warning("Milk+ button was not found; waiting for a fresh message")
 
@@ -169,13 +192,6 @@ class MilkingController:
             if any(word in button.text.casefold() for word in semantic):
                 return button
 
-        # Some versions show only an emoji. Use the first non-navigation,
-        # non-milking button in the menu's visual order.
-        excluded = ("\u043d\u0430\u0437\u0430\u0434", "\u0434\u043e\u0438\u0442\u044c", "\u043f\u043e\u0434\u043e\u0438\u0442\u044c", "\u043c\u043e\u043b\u043e\u043a\u043e")
-        for button in sorted(buttons, key=lambda item: (item.row, item.col)):
-            label = button.text.casefold()
-            if not any(word in label for word in excluded) and not MilkingController._is_timer_label(label):
-                return button
         return None
 
     @staticmethod
@@ -185,11 +201,6 @@ class MilkingController:
             if "\u0442\u0440\u0430\u0432" in label or "+5" in label or "5%" in label:
                 return button
 
-        excluded = ("\u043d\u0430\u0437\u0430\u0434", "\u0441\u0443\u043f", "\u0431\u0440\u043e\u043a", "\u0448\u0435\u0439\u043a", "\u043c\u043e\u043b\u043e\u043a\u043e")
-        for button in sorted(buttons, key=lambda item: (item.row, item.col)):
-            label = button.text.casefold()
-            if not any(word in label for word in excluded) and not MilkingController._is_timer_label(label):
-                return button
         return None
 
     @staticmethod
