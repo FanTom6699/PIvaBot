@@ -71,11 +71,18 @@ class MilkingController:
         if self.phase == "milk_plus":
             button = self._find_milk_plus(buttons)
             if button:
-                self.phase = "milk"
+                self.phase = "milk_button"
                 await self.navigator.execute({"action": "click", "button": button.text})
             return True
 
-        if self.phase == "milk":
+        if self.phase == "milk_button":
+            button = self._find_milk_button(buttons)
+            if button:
+                self.phase = "milking_result"
+                await self.navigator.execute({"action": "click", "button": button.text})
+            return True
+
+        if self.phase == "milking_result":
             if self._looks_like_milking_success(parsed.text):
                 await self._save_cooldown()
                 self.phase = "cooldown"
@@ -154,7 +161,20 @@ class MilkingController:
     def _find_milk_plus(buttons: list[ButtonInfo]) -> ButtonInfo | None:
         for button in buttons:
             label = button.text.casefold()
-            if "\u043c\u043e\u043b\u043e\u043a\u043e+" in label or "x2" in label or "\u00d72" in label:
+            if (
+                "\u043c\u043e\u043b\u043e\u043a\u043e+" in label
+                or "x2" in label
+                or "\u00d72" in label
+                or "\U0001f9fc" in label
+            ):
+                return button
+        return None
+
+    @staticmethod
+    def _find_milk_button(buttons: list[ButtonInfo]) -> ButtonInfo | None:
+        for button in buttons:
+            label = button.text.casefold()
+            if "\u043f\u043e\u0434\u043e\u0438\u0442\u044c" in label or label.strip() == "\u0434\u043e\u0438\u0442\u044c":
                 return button
         return None
 
