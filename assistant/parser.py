@@ -24,6 +24,7 @@ class ParsedMessage:
     timers: list[dict[str, Any]] = field(default_factory=list)
     account: dict[str, Any] = field(default_factory=dict)
     food_percent: int | None = None
+    milking_cooldown_seconds: int | None = None
     raw: dict[str, Any] = field(default_factory=dict)
 
 
@@ -126,6 +127,42 @@ def parse_food_percent(text: str) -> int | None:
     return min(100, int(match.group("percent")))
 
 
+def parse_milking_cooldown_seconds(text: str) -> int | None:
+    lower = text.casefold()
+    if "\u0434\u043e\u0438\u0442" not in lower and "\u0434\u043e\u0439\u043a" not in lower and "\u043c\u043e\u043b\u043e\u043a" not in lower:
+        return None
+
+    timer_words = (
+        "\u0447\u0435\u0440\u0435\u0437",
+        "\u0434\u043e ",
+        "\u043e\u0441\u0442\u0430\u043b",
+        "\u0436\u0434\u0430\u0442\u044c",
+        "\u043a\u0434",
+        "\u0442\u0430\u0439\u043c\u0435\u0440",
+    )
+    if not any(word in lower for word in timer_words):
+        return None
+
+    colon_match = re.search(r"(?<!\d)(?P<minutes>\d{1,2})\s*:\s*(?P<seconds>\d{2})(?!\d)", lower)
+    if colon_match:
+        return int(colon_match.group("minutes")) * 60 + int(colon_match.group("seconds"))
+
+    hours = _first_int(
+        re.compile(r"(\d+)\s*(?:\u0447|\u0447\u0430\u0441|\u0447\u0430\u0441\u0430|\u0447\u0430\u0441\u043e\u0432|h)\b", re.IGNORECASE),
+        lower,
+    )
+    minutes = _first_int(
+        re.compile(r"(\d+)\s*(?:\u043c|\u043c\u0438\u043d|\u043c\u0438\u043d\u0443\u0442|minutes|m)\b", re.IGNORECASE),
+        lower,
+    )
+    seconds = _first_int(
+        re.compile(r"(\d+)\s*(?:\u0441|\u0441\u0435\u043a|\u0441\u0435\u043a\u0443\u043d\u0434|seconds|s)\b", re.IGNORECASE),
+        lower,
+    )
+    total = hours * 3600 + minutes * 60 + seconds
+    return total if total > 0 else None
+
+
 def parse_tasks(text: str) -> list[dict[str, Any]]:
     tasks: list[dict[str, Any]] = []
     for line in text.splitlines():
@@ -154,5 +191,6 @@ def parse_message(message: Any) -> ParsedMessage:
         timers=parse_timers(text),
         account=parse_account(text),
         food_percent=parse_food_percent(text),
+        milking_cooldown_seconds=parse_milking_cooldown_seconds(text),
         raw={"date": message.date.isoformat() if message.date else None},
     )

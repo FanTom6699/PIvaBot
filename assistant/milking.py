@@ -39,7 +39,16 @@ class MilkingController:
 
     async def handle_message(self, message: Message, parsed: ParsedMessage) -> bool:
         del message
-        if not self.enabled or self.phase in {"idle", "cooldown"}:
+        if not self.enabled or self.phase == "idle":
+            return False
+
+        if parsed.milking_cooldown_seconds:
+            await self._save_cooldown(parsed.milking_cooldown_seconds)
+            self.phase = "cooldown"
+            logger.info("Milking cooldown detected from message: %s seconds", parsed.milking_cooldown_seconds)
+            return True
+
+        if self.phase == "cooldown":
             return False
 
         buttons = parsed.buttons
@@ -48,7 +57,7 @@ class MilkingController:
             phase_before_cleanup = self.phase
             await self.navigator.execute({"action": "click", "button": cleanup.text})
             if phase_before_cleanup == "milking_result":
-                await self._save_cooldown()
+                await self._save_cooldown(self.COOLDOWN_SECONDS)
                 self.phase = "cooldown"
                 logger.info("Cleanup after milking clicked; next attempt in 12 minutes")
             else:
@@ -105,9 +114,9 @@ class MilkingController:
 
         if self.phase == "milking_result":
             if self._looks_like_milking_success(parsed.text):
-                await self._save_cooldown()
+                await self._save_cooldown(parsed.milking_cooldown_seconds or self.COOLDOWN_SECONDS)
                 self.phase = "cooldown"
-                logger.info("Milking succeeded; next attempt in 12 minutes")
+                logger.info("Milking succeeded; next attempt is scheduled")
             return True
 
         return True
@@ -124,13 +133,13 @@ class MilkingController:
             logger.info("Milking cooldown finished; checking food again")
             break
 
-    async def _save_cooldown(self) -> None:
-        ready_at = datetime.now() + timedelta(seconds=self.COOLDOWN_SECONDS)
+    async def _save_cooldown(self, seconds: int) -> None:
+        ready_at = datetime.now() + timedelta(seconds=seconds)
         await self.db.upsert_timer(
             self.COOLDOWN_KEY,
-            "\u0414\u043e\u0439\u043a\u0430 \u0447\u0435\u0440\u0435\u0437 12 \u043c\u0438\u043d\u0443\u0442",
+            "\u0414\u043e\u0439\u043a\u0430 \u0447\u0435\u0440\u0435\u0437 \u0442\u0430\u0439\u043c\u0435\u0440 \u0438\u0437 \u0438\u0433\u0440\u044b",
             ready_at.isoformat(timespec="seconds"),
-            {"type": "milking", "seconds": self.COOLDOWN_SECONDS},
+            {"type": "milking", "seconds": seconds},
         )
 
     async def _send_command(self, text: str) -> None:
