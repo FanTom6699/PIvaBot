@@ -43,6 +43,18 @@ class MilkingController:
             return False
 
         buttons = parsed.buttons
+        cleanup = self._find_cleanup_button(buttons)
+        if cleanup:
+            phase_before_cleanup = self.phase
+            await self.navigator.execute({"action": "click", "button": cleanup.text})
+            if phase_before_cleanup == "milking_result":
+                await self._save_cooldown()
+                self.phase = "cooldown"
+                logger.info("Cleanup after milking clicked; next attempt in 12 minutes")
+            else:
+                self.phase = "await_main"
+            return True
+
         if self.phase == "await_main":
             if parsed.food_percent is None:
                 return True
@@ -186,6 +198,14 @@ class MilkingController:
         for button in buttons:
             label = button.text.casefold()
             if MilkingController._is_milk_button_label(label):
+                return button
+        return None
+
+    @staticmethod
+    def _find_cleanup_button(buttons: list[ButtonInfo]) -> ButtonInfo | None:
+        for button in buttons:
+            label = button.text.casefold()
+            if "\u0443\u0431\u0440\u0430\u0442\u044c" in label:
                 return button
         return None
 
