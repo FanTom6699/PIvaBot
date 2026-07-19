@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "keep_stock": {
+    "wheat": 20,
+    "feed": 10,
+    "milk": 5,
+    "egg": 5
+  },
+  "rare_items": [
+    "gem",
+    "gold_key",
+    "rare_seed"
+  ],
+  "protected_items": [
+    "gem",
+    "gold_key"
+  ],
+  "priorities": [
+    "collect_ready_rewards",
+    "feed_animals",
+    "harvest_crops",
+    "complete_tasks",
+    "craft_missing_stock",
+    "open_next_menu"
+  ],
+  "button_priorities": [
+    "Собрать",
+    "Забрать",
+    "Получить",
+    "Подоить",
+    "Покормить",
+    "Собрать урожай",
+    "Выполнить"
+  ],
+  "default_menus": [
+    "Рюкзак",
+    "Задания",
+    "Животные",
+    "Ферма"
+  ],
+  "limits": {
+    "min_action_delay_seconds": 2,
+    "max_wait_seconds": 3600
+  }
+}
+

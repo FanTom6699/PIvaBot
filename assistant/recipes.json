@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "recipes": [
+    {
+      "id": "milk",
+      "name": "🥛 Молоко",
+      "requires": {
+        "cow": 1,
+        "feed": 1
+      },
+      "produces": {
+        "milk": 1
+      },
+      "timer_seconds": 1200,
+      "priority": 80
+    },
+    {
+      "id": "egg",
+      "name": "🥚 Яйцо",
+      "requires": {
+        "chicken": 1,
+        "feed": 1
+      },
+      "produces": {
+        "egg": 1
+      },
+      "timer_seconds": 1200,
+      "priority": 70
+    }
+  ]
+}
+
