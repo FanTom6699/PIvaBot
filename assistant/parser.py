@@ -23,6 +23,7 @@ class ParsedMessage:
     animals: list[dict[str, Any]] = field(default_factory=list)
     timers: list[dict[str, Any]] = field(default_factory=list)
     account: dict[str, Any] = field(default_factory=dict)
+    food_percent: int | None = None
     raw: dict[str, Any] = field(default_factory=dict)
 
 
@@ -114,6 +115,17 @@ def parse_account(text: str) -> dict[str, Any]:
     return account
 
 
+def parse_food_percent(text: str) -> int | None:
+    pattern = (
+        r"(?:\u0445\u0430\u0432\u0447\u0438\u043a|\u0441\u044b\u0442\u043e\u0441\u0442\u044c|"
+        r"\u0435\u0434\u0430|food)[^\d]{0,24}(?P<percent>\d{1,3})\s*%?"
+    )
+    match = re.search(pattern, text, re.IGNORECASE)
+    if not match:
+        return None
+    return min(100, int(match.group("percent")))
+
+
 def parse_tasks(text: str) -> list[dict[str, Any]]:
     tasks: list[dict[str, Any]] = []
     for line in text.splitlines():
@@ -141,5 +153,6 @@ def parse_message(message: Any) -> ParsedMessage:
         animals=parse_animals(text),
         timers=parse_timers(text),
         account=parse_account(text),
+        food_percent=parse_food_percent(text),
         raw={"date": message.date.isoformat() if message.date else None},
     )

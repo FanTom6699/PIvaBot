@@ -10,6 +10,7 @@ from .config import AssistantConfig
 from .database import Database
 from .inventory import GameMemory
 from .logger import setup_logging
+from .milking import MilkingController
 from .navigation import Navigator
 from .parser import parse_message
 from .scheduler import Scheduler
@@ -27,6 +28,7 @@ class AssistantApp:
         self.memory = GameMemory(self.db)
         self.navigator: Navigator | None = None
         self.scheduler: Scheduler | None = None
+        self.milking: MilkingController | None = None
         self.llm = None
         self._message_lock = asyncio.Lock()
 
@@ -40,10 +42,16 @@ class AssistantApp:
         )
         self.llm = build_llm(self.config.openai_api_key, self.config.openai_model, recipes, rules)
         self.navigator = Navigator(self.telegram, self.db, dry_run=self.config.dry_run)
-        self.scheduler = Scheduler(self.db, self.navigator, self.config.loop_interval_seconds)
+        self.milking = MilkingController(self.navigator, self.db, enabled=self.config.milking_enabled)
+        self.scheduler = Scheduler(
+            self.db,
+            self.navigator,
+            self.config.loop_interval_seconds,
+            on_tick=self.milking.tick,
+        )
 
         self.telegram.on_target_message(self.handle_message)
-        await self.telegram.open_target_dialog()
+        await self.milking.start()
 
         scheduler_task = asyncio.create_task(self.scheduler.run())
         logger.info("Assistant started. dry_run=%s", self.config.dry_run)
@@ -61,6 +69,8 @@ class AssistantApp:
             parsed = parse_message(message)
             self.navigator.update_last_message(message, parsed)
             await self.memory.update_from_message(parsed)
+            if self.milking and await self.milking.handle_message(message, parsed):
+                return
             state = await self.memory.build_state(parsed)
             action = await self.llm.decide(state)
             await self.navigator.execute(action)

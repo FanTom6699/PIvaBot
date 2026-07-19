@@ -24,10 +24,10 @@ class GameTelegramClient:
         self.target_entity = await self.client.get_entity(self.config.target_bot)
         logger.info("Connected as user account. Target bot: %s", self.config.target_bot)
 
-    async def open_target_dialog(self) -> Message:
+    async def open_target_dialog(self, command: str = "\u043c\u0443\u043a") -> Message:
         if not self.target_entity:
             raise RuntimeError("Client is not started")
-        return await self.client.send_message(self.target_entity, "/start")
+        return await self.client.send_message(self.target_entity, command)
 
     def on_target_message(self, handler: MessageHandler) -> None:
         if not self.target_entity:
@@ -53,4 +53,3 @@ class GameTelegramClient:
 
     async def run_until_disconnected(self) -> None:
         await self.client.run_until_disconnected()
-

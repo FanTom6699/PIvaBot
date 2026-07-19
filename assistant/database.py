@@ -182,6 +182,21 @@ class Database:
         await self.db.execute("UPDATE timers SET completed = 1 WHERE key = ?", (key,))
         await self.db.commit()
 
+    async def get_timer(self, key: str) -> dict[str, Any] | None:
+        cursor = await self.db.execute(
+            "SELECT key, label, ready_at, payload FROM timers WHERE key = ? AND completed = 0",
+            (key,),
+        )
+        row = await cursor.fetchone()
+        if not row:
+            return None
+        return {
+            "key": row["key"],
+            "label": row["label"],
+            "ready_at": row["ready_at"],
+            "payload": json.loads(row["payload"]),
+        }
+
     async def add_action(self, action: str, payload: dict[str, Any], result: str | None = None) -> None:
         await self.db.execute(
             "INSERT INTO actions (action, payload, result, created_at) VALUES (?, ?, ?, ?)",
@@ -216,4 +231,3 @@ class Database:
             (message_id, json.dumps(payload, ensure_ascii=False), datetime.now().isoformat(timespec="seconds")),
         )
         await self.db.commit()
-
