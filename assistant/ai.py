@@ -5,7 +5,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any, Literal
 
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, OpenAIError
 
 
 logger = logging.getLogger(__name__)
@@ -48,6 +48,7 @@ class OpenAILLMClient(LLMClient):
         self.model = model
         self.recipes = recipes
         self.rules = rules
+        self.fallback = HeuristicLLMClient(rules)
 
     async def decide(self, context: dict[str, Any]) -> dict[str, Any]:
         prompt = {
@@ -71,10 +72,15 @@ class OpenAILLMClient(LLMClient):
             "rules": self.rules,
             "state": context,
         }
-        response = await self.client.responses.create(
-            model=self.model,
-            input=json.dumps(prompt, ensure_ascii=False),
-        )
+        try:
+            response = await self.client.responses.create(
+                model=self.model,
+                input=json.dumps(prompt, ensure_ascii=False),
+            )
+        except OpenAIError as error:
+            logger.error("OpenAI API error, using heuristic fallback: %s", error)
+            return await self.fallback.decide(context)
+
         text = response.output_text.strip()
         try:
             return validate_action(json.loads(text))
@@ -116,4 +122,3 @@ def build_llm(api_key: str | None, model: str, recipes: dict[str, Any], rules: d
         return OpenAILLMClient(api_key, model, recipes, rules)
     logger.warning("OPENAI_API_KEY is not set. Using heuristic fallback.")
     return HeuristicLLMClient(rules)
-
