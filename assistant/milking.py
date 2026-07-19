@@ -192,13 +192,34 @@ class MilkingController:
             if any(word in button.text.casefold() for word in semantic):
                 return button
 
+        # Main menu shows a single food emoji between timer/milk and utility buttons.
+        excluded = (
+            "\u043d\u0430\u0437\u0430\u0434",
+            "\u0441\u043b\u0438\u0432",
+            "\u0440\u044e\u043a\u0437\u0430\u043a",
+            "\u0434\u043e\u0438\u0442\u044c",
+            "\u043f\u043e\u0434\u043e\u0438\u0442\u044c",
+            "\u043c\u043e\u043b\u043e\u043a\u043e",
+            "\u0443\u0431\u0440\u0430\u0442\u044c",
+        )
+        excluded_icons = ("\U0001f392", "\U0001f95b", "\U0001f9fc", "\U0001f4a9", "\u23f0")
+        for button in sorted(buttons, key=lambda item: (item.row, item.col)):
+            label = button.text.casefold()
+            if MilkingController._is_timer_label(label):
+                continue
+            if any(word in label for word in excluded):
+                continue
+            if any(icon in button.text for icon in excluded_icons):
+                continue
+            if len(button.text.strip()) <= 4:
+                return button
         return None
 
     @staticmethod
     def _find_grass(buttons: list[ButtonInfo]) -> ButtonInfo | None:
         for button in buttons:
             label = button.text.casefold()
-            if "\u0442\u0440\u0430\u0432" in label or "+5" in label or "5%" in label:
+            if "\U0001f33f" in button.text or "\u0442\u0440\u0430\u0432" in label or "+5" in label or "5%" in label:
                 return button
 
         return None
