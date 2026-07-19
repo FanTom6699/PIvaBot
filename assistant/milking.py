@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime, timedelta
 import time
 
@@ -32,9 +33,7 @@ class MilkingController:
             return
         existing = await self.db.get_timer(self.COOLDOWN_KEY)
         if existing:
-            self.phase = "cooldown"
-            logger.info("Milking cooldown restored until %s", existing["ready_at"])
-            return
+            logger.info("Stored milking cooldown exists until %s; checking real game menu", existing["ready_at"])
         self.phase = "await_main"
         await self._send_command("\u043c\u0443\u043a")
         logger.info("Milking flow started with command: мук")
@@ -75,12 +74,21 @@ class MilkingController:
             return True
 
         if self.phase == "await_main":
+            milk_button = self._find_milk_button(buttons)
+            if not milk_button:
+                cooldown_seconds = self._cooldown_seconds_from_buttons(buttons)
+                if cooldown_seconds:
+                    await self._save_cooldown(cooldown_seconds)
+                    self.phase = "cooldown"
+                    logger.info("Milking cooldown detected from button: %s seconds", cooldown_seconds)
+                    return True
+
             if parsed.food_percent is None:
                 await self._refresh_main_menu("Food percent was not found")
                 return True
             if parsed.food_percent < 99:
-                self.phase = "food_menu"
-                await self._click_food_menu(buttons)
+                if await self._click_food_menu(buttons):
+                    self.phase = "food_menu"
             else:
                 self.phase = "milk_plus"
                 await self._click_milk_plus(buttons)
@@ -91,6 +99,9 @@ class MilkingController:
             if grass:
                 self.phase = "after_grass"
                 await self.navigator.click_current_button(grass)
+            elif parsed.food_percent is not None:
+                self.phase = "await_main"
+                await self._click_food_menu(buttons)
             else:
                 logger.warning("Grass button was not found. Buttons: %s", self._button_labels(buttons))
             return True
@@ -171,12 +182,13 @@ class MilkingController:
         self._last_menu_refresh_at = now
         await self._send_command("\u043c\u0443\u043a")
 
-    async def _click_food_menu(self, buttons: list[ButtonInfo]) -> None:
+    async def _click_food_menu(self, buttons: list[ButtonInfo]) -> bool:
         button = self._find_food_menu(buttons)
         if button:
             await self.navigator.click_current_button(button)
-        else:
-            logger.warning("Food menu button was not found. Buttons: %s", self._button_labels(buttons))
+            return True
+        logger.warning("Food menu button was not found. Buttons: %s", self._button_labels(buttons))
+        return False
 
     async def _click_milk_plus(self, buttons: list[ButtonInfo]) -> None:
         button = self._find_milk_plus(buttons)
@@ -191,6 +203,17 @@ class MilkingController:
         for button in buttons:
             if any(word in button.text.casefold() for word in semantic):
                 return button
+
+        sorted_buttons = sorted(buttons, key=lambda item: (item.row, item.col))
+        if len(sorted_buttons) >= 2:
+            candidate = sorted_buttons[1]
+            label = candidate.text.casefold()
+            if (
+                not MilkingController._is_timer_label(label)
+                and not MilkingController._is_milk_button_label(label)
+                and not MilkingController._is_utility_label(candidate.text)
+            ):
+                return candidate
 
         # Main menu shows a single food emoji between timer/milk and utility buttons.
         excluded = (
@@ -272,6 +295,55 @@ class MilkingController:
             "\u0442\u0430\u0439\u043c\u0435\u0440",
         )
         return has_digit and any(word in label for word in timer_words)
+
+    @staticmethod
+    def _is_utility_label(label: str) -> bool:
+        lower = label.casefold()
+        utility_words = (
+            "\u043d\u0430\u0437\u0430\u0434",
+            "\u0441\u043b\u0438\u0432",
+            "\u0440\u044e\u043a\u0437\u0430\u043a",
+            "\u0443\u0431\u0440\u0430\u0442\u044c",
+        )
+        utility_icons = ("\U0001f392", "\U0001f4a9", "\u23f0")
+        return any(word in lower for word in utility_words) or any(icon in label for icon in utility_icons)
+
+    @staticmethod
+    def _cooldown_seconds_from_buttons(buttons: list[ButtonInfo]) -> int | None:
+        for button in buttons:
+            label = button.text.casefold()
+            if not MilkingController._is_timer_label(label):
+                continue
+            seconds = MilkingController._duration_seconds(label)
+            if seconds:
+                return seconds
+        return None
+
+    @staticmethod
+    def _duration_seconds(text: str) -> int | None:
+        colon_match = re.search(r"(?<!\d)(?P<minutes>\d{1,2})\s*:\s*(?P<seconds>\d{2})(?!\d)", text)
+        if colon_match:
+            return int(colon_match.group("minutes")) * 60 + int(colon_match.group("seconds"))
+
+        hours = MilkingController._first_duration_part(
+            r"(\d+)\s*(?:\u0447|\u0447\u0430\u0441|\u0447\u0430\u0441\u0430|\u0447\u0430\u0441\u043e\u0432|h)\b",
+            text,
+        )
+        minutes = MilkingController._first_duration_part(
+            r"(\d+)\s*(?:\u043c|\u043c\u0438\u043d|\u043c\u0438\u043d\u0443\u0442|\u043c\u0438\u043d\u0443\u0442\u044b|minutes|m)\b",
+            text,
+        )
+        seconds = MilkingController._first_duration_part(
+            r"(\d+)\s*(?:\u0441|\u0441\u0435\u043a|\u0441\u0435\u043a\u0443\u043d\u0434|\u0441\u0435\u043a\u0443\u043d\u0434\u044b|seconds|s)\b",
+            text,
+        )
+        total = hours * 3600 + minutes * 60 + seconds
+        return total if total > 0 else None
+
+    @staticmethod
+    def _first_duration_part(pattern: str, text: str) -> int:
+        match = re.search(pattern, text, re.IGNORECASE)
+        return int(match.group(1)) if match else 0
 
     @staticmethod
     def _find_back(buttons: list[ButtonInfo]) -> ButtonInfo | None:
