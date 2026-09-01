@@ -9,8 +9,6 @@ from .game_roulette import roulette_router
 from .game_ball import ball_router
 
 # --- ✅ НОВЫЕ ИМПОРТЫ ФЕРМЫ ---
-from .farm import farm_router
-from .give import give_router
 # --- ---
 
 main_router = Router()
@@ -23,7 +21,5 @@ main_router.include_routers(
     ball_router,
 
     # --- ✅ НОВЫЕ РОУТЕРЫ ФЕРМЫ ---
-    farm_router,
-    give_router
     # --- ---
 )

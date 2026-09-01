@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PIvaBot - игровой Telegram-бот</title>
-  <meta name="description" content="PIvaBot - игровой Telegram-бот для чатов: пиво, рейтинги, ферма, джекпот, заказы и мини-игры.">
+  <meta name="description" content="PIvaBot - игровой Telegram-бот для чатов: пиво, рейтинги, джекпот и мини-игры.">
   <style>
     :root {
       --bg: #0f1014;
@@ -459,7 +459,6 @@
           <a class="chip" href="#commands">Команды</a>
           <a class="chip" href="#about">О боте</a>
           <a class="chip" href="#phrases">Фразы</a>
-          <a class="chip" href="#farm">Ферма</a>
           <a class="chip" href="#games">Игры</a>
         </div>
       </nav>
@@ -469,7 +468,7 @@
       <div>
         <div class="eyebrow">🍻 Игровой бот для Telegram-чатов</div>
         <h1>PIvaBot — игровой бот для чатов</h1>
-        <p class="lead">Пивной бар внутри Telegram: пей пиво, копи ⭐ XP, выращивай зерно и хмель, вари партии, выполняй заказы и соревнуйся с друзьями.</p>
+        <p class="lead">Пивной бар внутри Telegram: пей пиво, лови джекпот и соревнуйся с друзьями в рейтингах и мини-играх.</p>
         <div class="hero-actions">
           <a class="btn btn-primary" href="https://t.me/PivoBaronbot">Открыть бота</a>
           <a class="btn" href="#about">Что это за бот</a>
@@ -484,7 +483,7 @@
 
   <main class="wrap">
     <div class="search-panel">
-      <input id="search" class="search" type="search" placeholder="Найти команду или механику: пиво, ферма, рейтинг хмель, рулетка...">
+      <input id="search" class="search" type="search" placeholder="Найти команду или механику: пиво, рейтинг, рулетка...">
     </div>
 
     <section class="toc" aria-label="Оглавление">
@@ -493,7 +492,6 @@
         <li><a href="#about">О боте</a></li>
         <li><a href="#commands">Основные команды</a></li>
         <li><a href="#phrases">Фразы без слэша</a></li>
-        <li><a href="#farm">Ферма и производство</a></li>
         <li><a href="#games">Мини-игры</a></li>
         <li><a href="#start">Быстрый старт</a></li>
       </ol>
@@ -507,13 +505,13 @@
       <div class="grid">
         <article class="card searchable">
           <h3>🍺 Игровой бар</h3>
-          <p class="desc">Игроки пьют пиво, получают или теряют 🍺, ловят джекпот, копят ⭐ XP и поднимаются в рейтингах чата.</p>
-          <div class="tags"><span class="tag">пиво</span><span class="tag">XP</span><span class="tag">джекпот</span><span class="tag">топ чата</span></div>
+          <p class="desc">Игроки пьют пиво, получают или теряют 🍺, ловят джекпот и поднимаются в рейтингах чата.</p>
+          <div class="tags"><span class="tag">пиво</span><span class="tag">джекпот</span><span class="tag">топ чата</span></div>
         </article>
         <article class="card searchable">
-          <h3>🌾 Ферма</h3>
-          <p class="desc">Можно выращивать зерно и хмель, варить пиво, выполнять заказы и улучшать поле с пивоварней.</p>
-          <div class="tags"><span class="tag">ферма</span><span class="tag">пивоварня</span><span class="tag">заказы</span></div>
+          <h3>🏆 Рейтинги</h3>
+          <p class="desc">Сравнивай количество 🍺 с игроками во всем боте или внутри своего чата.</p>
+          <div class="tags"><span class="tag">рейтинг</span><span class="tag">топ чата</span><span class="tag">соревнование</span></div>
         </article>
         <article class="card searchable">
           <h3>🎲 Мини-игры</h3>
@@ -523,11 +521,11 @@
         <article class="card searchable wide">
           <h3>🚀 Как начать</h3>
           <p class="desc">Открой <a href="https://t.me/PivoBaronbot">@PivoBaronbot</a> в Telegram, нажми <code>/start</code>, затем добавь его в группу. В личке работает меню с кнопками, а в группе можно писать команды и короткие фразы без слэша.</p>
-          <div class="tags"><span class="tag">@PivoBaronbot</span><span class="tag">/start</span><span class="tag">/help</span><span class="tag">пиво</span><span class="tag">ферма</span></div>
+          <div class="tags"><span class="tag">@PivoBaronbot</span><span class="tag">/start</span><span class="tag">/help</span><span class="tag">пиво</span><span class="tag">рейтинг</span></div>
         </article>
         <article class="card searchable">
           <h3>📘 Этот сайт</h3>
-          <p class="desc">Здесь собран справочник: команды, фразы, ферма, рейтинги, мини-игры и быстрый старт для новых игроков.</p>
+          <p class="desc">Здесь собран справочник: команды, фразы, рейтинги, мини-игры и быстрый старт для новых игроков.</p>
           <div class="tags"><span class="tag">справочник</span><span class="tag">команды</span></div>
         </article>
       </div>
@@ -546,13 +544,8 @@
         </article>
         <article class="card searchable">
           <h3>👤 /me</h3>
-          <p class="desc">Показывает профиль игрока: уровень по ⭐ XP, титул, баланс 🍺, место в рейтинге и дату регистрации.</p>
+          <p class="desc">Показывает профиль игрока: баланс 🍺, место в рейтинге и дату регистрации.</p>
           <div class="tags"><span class="tag">/me</span><span class="tag">/profile</span><span class="tag">профиль</span></div>
-        </article>
-        <article class="card searchable">
-          <h3>🌾 /farm</h3>
-          <p class="desc">Открывает ферму, поле, пивоварню, склад, магазин, заказы и улучшения.</p>
-          <div class="tags"><span class="tag">/farm</span><span class="tag">ферма</span><span class="tag">моя ферма</span></div>
         </article>
         <article class="card searchable">
           <h3>🏆 /top</h3>
@@ -561,7 +554,7 @@
         </article>
         <article class="card searchable">
           <h3>🌐 /rating</h3>
-          <p class="desc">Открывает глобальный рейтинг по пиву, зерну и хмелю.</p>
+          <p class="desc">Открывает глобальный рейтинг по пиву.</p>
           <div class="tags"><span class="tag">/rating</span><span class="tag">рейтинг</span><span class="tag">рейт глоб</span></div>
         </article>
         <article class="card searchable">
@@ -579,25 +572,7 @@
       </div>
       <div class="list">
         <div class="row searchable"><div class="cmd">пиво</div><div>Запускает выпить пиво. Также работают: <span class="tag">выпить пиво</span> <span class="tag">пивко</span> <span class="tag">пивасик</span> <span class="tag">налей пиво</span></div></div>
-        <div class="row searchable"><div class="cmd">ферма</div><div>Открывает ферму. Также работает: <span class="tag">моя ферма</span></div></div>
         <div class="row searchable"><div class="cmd">рейтинг пиво</div><div>Сразу показывает глобальный рейтинг по текущему количеству 🍺.<br>Также: <span class="tag">рейт пиво</span></div></div>
-        <div class="row searchable"><div class="cmd">рейтинг зерно</div><div>Сразу показывает рейтинг по собранному за все время 🌾 зерну.<br>Также: <span class="tag">рейт зерно</span></div></div>
-        <div class="row searchable"><div class="cmd">рейтинг хмель</div><div>Сразу показывает рейтинг по собранному за все время 🌱 хмелю.<br>Также: <span class="tag">рейт хмель</span></div></div>
-      </div>
-    </section>
-
-    <section id="farm">
-      <div class="section-head">
-        <h2>Ферма</h2>
-        <p class="section-note">Ферма превращает ресурсы в пиво и готовит развитие через отдельный ⭐ XP.</p>
-      </div>
-      <div class="grid">
-        <article class="card searchable"><h3>🌾 Поле</h3><p class="desc">Выбирай свободную грядку и сажай ячмень или хмель бесплатно. Когда урожай готов, появляется кнопка сбора.</p></article>
-        <article class="card searchable"><h3>🏭 Пивоварня</h3><p class="desc">Тратит зерно и хмель, запускает варку и после таймера выдает 🍺. Опыт будет подключаться отдельными наградами.</p></article>
-        <article class="card searchable"><h3>📦 Амбар</h3><p class="desc">Хранит собранные ресурсы и показывает заполненность склада.</p></article>
-        <article class="card searchable"><h3>📋 Заказы</h3><p class="desc">Сдавай ресурсы и получай награды: пиво, предметы или новые ресурсы.</p></article>
-        <article class="card searchable"><h3>⭐ Улучшения</h3><p class="desc">Сейчас доступны для пивоварни. Перед улучшением объект должен быть свободен.</p></article>
-        <article class="card searchable"><h3>🏪 Магазин фермы</h3><p class="desc">Будущие покупки для развития фермы и амбара.</p></article>
       </div>
     </section>
 
@@ -633,8 +608,8 @@
       <div class="steps">
         <div class="step searchable"><b>/start</b><br><span class="desc">Напиши боту в личку и зарегистрируйся.</span></div>
         <div class="step searchable"><b>пиво</b><br><span class="desc">Напиши в группе и получи первые 🍺.</span></div>
-        <div class="step searchable"><b>ферма</b><br><span class="desc">Выращивай 🌾 зерно и 🌱 хмель.</span></div>
-        <div class="step searchable"><b>рейтинг</b><br><span class="desc">Смотри места игроков и соревнуйся.</span></div>
+        <div class="step searchable"><b>рейтинг</b><br><span class="desc">Проверь место среди игроков по количеству 🍺.</span></div>
+        <div class="step searchable"><b>/roulette 10 4</b><br><span class="desc">Запусти мини-игру в группе, когда накопишь 🍺 на ставку.</span></div>
       </div>
     </section>
 

@@ -33,10 +33,9 @@ def get_main_menu_keyboard(user_id: int) -> InlineKeyboardMarkup:
         ],
         [
             InlineKeyboardButton(text="🏆 Рейтинг", callback_data=MainMenuCallback(action="rating").pack()),
-            InlineKeyboardButton(text="🌾 Ферма", callback_data=f"farm:main_dashboard:{user_id}"),
+            InlineKeyboardButton(text="🎁 Джекпот", callback_data=MainMenuCallback(action="jackpot").pack()),
         ],
         [
-            InlineKeyboardButton(text="🎁 Джекпот", callback_data=MainMenuCallback(action="jackpot").pack()),
             InlineKeyboardButton(text="❓ Помощь", callback_data=MainMenuCallback(action="help").pack()),
         ],
     ])
@@ -58,10 +57,6 @@ def get_guide_keyboard(show_main_menu: bool = False) -> InlineKeyboardMarkup:
 def get_rating_keyboard(show_main_menu: bool = True) -> InlineKeyboardMarkup:
     rows = [
         [InlineKeyboardButton(text="🍺 Пиво", callback_data=MainMenuCallback(action="rating_beer").pack())],
-        [
-            InlineKeyboardButton(text="🌾 Зерно", callback_data=MainMenuCallback(action="rating_grain").pack()),
-            InlineKeyboardButton(text="🌱 Хмель", callback_data=MainMenuCallback(action="rating_hops").pack()),
-        ],
     ]
     if show_main_menu:
         rows.append([InlineKeyboardButton(text="⬅️ Назад в меню", callback_data=MainMenuCallback(action="home").pack())])
@@ -379,9 +374,7 @@ def get_rating_menu_text() -> str:
         "🏆 <b>Рейтинг</b>\n\n"
         "Выбери таблицу.\n\n"
         f"{DIVIDER}\n"
-        "🍺 <b>Пиво</b> — глобальный рейтинг.\n"
-        "🌾 <b>Зерно</b> — всего собрано зерна.\n"
-        "🌱 <b>Хмель</b> — всего собрано хмеля."
+        "🍺 <b>Пиво</b> — глобальный рейтинг игроков."
     )
 
 
@@ -433,7 +426,7 @@ def get_jackpot_text(current_jackpot: int) -> str:
 def get_help_text() -> str:
     return (
         "📘 <b>Справочник PIvaBot</b>\n\n"
-        "Полный список команд, фраз без слэша, ферма, рейтинги и мини-игры находятся тут.\n\n"
+        "Полный список команд, фраз без слэша, рейтингов и мини-игр находится тут.\n\n"
         f"{DIVIDER}\n"
         "Нажми кнопку ниже, чтобы открыть справочник команд."
     )

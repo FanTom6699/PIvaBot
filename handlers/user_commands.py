@@ -16,7 +16,6 @@ from .common import (
     get_compact_profile_text,
     get_profile_keyboard,
     get_profile_text,
-    get_harvest_rating_text,
     get_rating_keyboard,
     get_rating_menu_text,
     get_top_text,
@@ -25,10 +24,8 @@ from .text_aliases import (
     BEER_ALIASES,
     BEER_RATING_ALIASES,
     CHAT_TOP_ALIASES,
-    GRAIN_RATING_ALIASES,
     GLOBAL_RATING_ALIASES,
     GroupTextAlias,
-    HOPS_RATING_ALIASES,
     PROFILE_ALIASES,
 )
 
@@ -115,18 +112,6 @@ async def alias_rating(message: Message):
 @user_commands_router.message(GroupTextAlias(*BEER_RATING_ALIASES))
 async def alias_rating_beer(message: Message, db: Database):
     text = await get_top_text(db, message.from_user.id)
-    await answer_to_trigger(message, text, parse_mode='HTML')
-
-
-@user_commands_router.message(GroupTextAlias(*GRAIN_RATING_ALIASES))
-async def alias_rating_grain(message: Message, db: Database):
-    text = await get_harvest_rating_text(db, message.from_user.id, "зерно")
-    await answer_to_trigger(message, text, parse_mode='HTML')
-
-
-@user_commands_router.message(GroupTextAlias(*HOPS_RATING_ALIASES))
-async def alias_rating_hops(message: Message, db: Database):
-    text = await get_harvest_rating_text(db, message.from_user.id, "хмель")
     await answer_to_trigger(message, text, parse_mode='HTML')
 
 
