@@ -875,29 +875,27 @@ async def cq_farm_order_complete(callback: CallbackQuery, callback_data: OrderCa
     if not await check_owner(callback, callback_data.owner_id):
         return
     user_id = callback.from_user.id
-    current_order_id, next_order_time = await db.get_current_order(user_id)
-    if next_order_time or current_order_id != callback_data.order_id:
-        await callback.answer("Этот заказ уже устарел.", show_alert=True)
-        return
-
-    order = FARM_ORDER_POOL.get(current_order_id)
+    order = FARM_ORDER_POOL.get(callback_data.order_id)
     if not order:
         await callback.answer("Заказ не найден.", show_alert=True)
         return
 
-    inventory = await db.get_user_inventory(user_id)
-    if not can_complete_order(order, inventory):
+    result = await db.complete_farm_order(
+        user_id=user_id,
+        order_id=callback_data.order_id,
+        required_items=order["items"],
+        beer_reward=order["reward_amount"],
+        xp_reward=order["reward_xp"],
+        cooldown_minutes=ORDER_COOLDOWN_MINUTES,
+    )
+    if result["status"] == "unavailable":
+        await callback.answer("Этот заказ уже устарел.", show_alert=True)
+        return
+    if result["status"] == "not_enough":
         await callback.answer("Не хватает ресурсов для заказа.", show_alert=True)
         return
 
-    for item_id, amount in order["items"].items():
-        if not await db.modify_inventory(user_id, item_id, -amount):
-            await callback.answer("Не получилось списать ресурсы.", show_alert=True)
-            return
-
-    await db.change_rating(user_id, order["reward_amount"])
-    _, level_alert = await add_xp_and_get_alert(db, user_id, order["reward_xp"], "farm_order")
-    await db.complete_current_order(user_id, current_order_id, ORDER_COOLDOWN_MINUTES)
+    level_alert = format_level_alert(result["old_xp"], result["new_xp"])
 
     await callback.answer(
         f"Заказ выполнен!\n+{order['reward_amount']} 🍺\n+{order['reward_xp']} XP{level_alert}",

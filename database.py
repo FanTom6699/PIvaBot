@@ -870,6 +870,96 @@ class Database:
             await db.commit()
             return True
 
+    async def complete_farm_order(
+        self,
+        user_id: int,
+        order_id: str,
+        required_items: Dict[str, int],
+        beer_reward: int,
+        xp_reward: int,
+        cooldown_minutes: int,
+    ) -> Dict[str, Any]:
+        """Atomically exchange farm resources for an order reward."""
+        now = datetime.now()
+        next_order_time = now + timedelta(minutes=cooldown_minutes)
+
+        async with aiosqlite.connect(self.db_name, timeout=20) as db:
+            await db.execute("BEGIN IMMEDIATE")
+            try:
+                cursor = await db.execute(
+                    """
+                    SELECT 1 FROM user_orders
+                    WHERE user_id = ? AND slot_id = 1 AND order_id = ? AND is_completed = 0
+                    """,
+                    (user_id, order_id),
+                )
+                if not await cursor.fetchone():
+                    await db.rollback()
+                    return {"status": "unavailable"}
+
+                cursor = await db.execute(
+                    "SELECT items_json FROM user_inventory WHERE user_id = ?",
+                    (user_id,),
+                )
+                inventory_row = await cursor.fetchone()
+                inventory = DEFAULT_INVENTORY.copy()
+                if inventory_row and inventory_row[0]:
+                    inventory.update(json.loads(inventory_row[0]))
+
+                if any(inventory.get(item_id, 0) < amount for item_id, amount in required_items.items()):
+                    await db.rollback()
+                    return {"status": "not_enough"}
+
+                cursor = await db.execute(
+                    "SELECT beer_rating, max_beer_rating, xp FROM users WHERE user_id = ?",
+                    (user_id,),
+                )
+                user_row = await cursor.fetchone()
+                if not user_row:
+                    await db.rollback()
+                    return {"status": "unavailable"}
+
+                old_beer = user_row[0] or 0
+                old_max_beer = user_row[1] or old_beer
+                old_xp = user_row[2] or 0
+                new_beer = old_beer + beer_reward
+                new_xp = old_xp + xp_reward
+
+                for item_id, amount in required_items.items():
+                    inventory[item_id] -= amount
+
+                await db.execute(
+                    "INSERT OR REPLACE INTO user_inventory (user_id, items_json) VALUES (?, ?)",
+                    (user_id, json.dumps(inventory)),
+                )
+                await db.execute(
+                    """
+                    UPDATE users
+                    SET beer_rating = ?, max_beer_rating = ?, xp = ?
+                    WHERE user_id = ?
+                    """,
+                    (new_beer, max(old_max_beer, new_beer), new_xp, user_id),
+                )
+                await db.execute(
+                    "DELETE FROM user_orders WHERE user_id = ? AND slot_id = 1 AND order_id = ? AND is_completed = 0",
+                    (user_id, order_id),
+                )
+                await db.execute(
+                    """
+                    INSERT INTO user_orders_meta (user_id, last_reset_time, next_order_time)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(user_id) DO UPDATE SET
+                        last_reset_time = excluded.last_reset_time,
+                        next_order_time = excluded.next_order_time
+                    """,
+                    (user_id, now.isoformat(), next_order_time.isoformat()),
+                )
+                await db.commit()
+                return {"status": "completed", "old_xp": old_xp, "new_xp": new_xp}
+            except Exception:
+                await db.rollback()
+                raise
+
     async def collect_chicken_egg(self, user_id: int, chicken_number: int) -> bool:
         async with aiosqlite.connect(self.db_name) as db:
             await self._ensure_user_chickens(db, user_id)

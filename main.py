@@ -133,7 +133,6 @@ async def main():
     await setup_bot_commands(bot)
 
     # Фоновые задачи
-    asyncio.create_task(farm_background_updater(bot, db))
 
     logging.info("🚀 Бот запущен (polling)")
     await dp.start_polling(bot)
