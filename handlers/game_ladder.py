@@ -4,6 +4,7 @@ import random
 from datetime import datetime, timedelta
 from contextlib import suppress
 import logging
+from uuid import uuid4
 from decimal import Decimal, ROUND_HALF_UP
 from typing import List
 
@@ -32,11 +33,12 @@ class LadderCallbackData(CallbackData, prefix="ladder"):
 
 # --- КЛАССЫ И КОНСТАНТЫ ---
 class LadderGameState:
-    def __init__(self, player_id, chat_id, message_id, stake, correct_path):
+    def __init__(self, player_id, chat_id, message_id, stake, correct_path, game_id):
         self.player_id = player_id
         self.chat_id = chat_id
         self.message_id = message_id
         self.stake = stake
+        self.game_id = game_id
         self.correct_path: List[int] = correct_path
         self.player_choices = {}
         self.current_level = 1
@@ -44,6 +46,7 @@ class LadderGameState:
         self.is_finished = False
         self.last_choice = -1
         self.task = None
+        self.action_lock = asyncio.Lock()
 
 LADDER_LEVELS = 10
 LADDER_INACTIVITY_TIMEOUT_SECONDS = 60
@@ -80,7 +83,7 @@ async def schedule_ladder_timeout(chat_id: int, player_id: int, message_id: int,
         if chat_id in active_ladder_games:
             game = active_ladder_games[chat_id]
             if game.player_id == player_id and game.current_level == 1 and not game.is_finished:
-                await db.change_rating(player_id, stake)
+                await db.refund_game_bets(game.game_id)
                 await bot.send_message(
                     chat_id=chat_id,
                     text=f"⏰ Игра в 'Лесенку' отменена из-за бездействия. Ваша ставка {stake} 🍺 возвращена."
@@ -162,7 +165,7 @@ async def cancel_ladder_game(bot: Bot, db: Database, game: LadderGameState, reas
         game.task.cancel()
         game.task = None
 
-    await db.change_rating(game.player_id, game.stake)
+    await db.refund_game_bets(game.game_id)
 
     with suppress(TelegramBadRequest):
         await bot.delete_message(chat_id=game.chat_id, message_id=game.message_id)
@@ -203,7 +206,7 @@ async def end_ladder_game(bot: Bot, chat_id: int, user: User, game: LadderGameSt
         completed_level = max(0, min(game.current_level - 1, LADDER_LEVELS))
         is_full_clear = game.current_level > LADDER_LEVELS
         title = "🎉 <b>Победа в Лесенке!</b> 🎉" if is_full_clear else "💰 <b>Выигрыш забран</b>"
-        await db.change_rating(game.player_id, win_amount)
+        await db.settle_game_bets(game.game_id, {game.player_id: win_amount})
         text = (
             f"{title}\n\n"
             f"{LADDER_LEVEL_LINES[completed_level]}\n\n"
@@ -252,17 +255,24 @@ async def generate_final_board_text(game: LadderGameState, rewards: List[int], i
 async def start_ladder_game(chat: Chat, user: User, bot: Bot, stake: int, db: Database):
     await bot.send_chat_action(chat_id=chat.id, action=ChatAction.TYPING)
     await asyncio.sleep(0.3)
-    await db.change_rating(user.id, -stake)
+    game_id = f"ladder:{chat.id}:{user.id}:{uuid4().hex}"
+    if not await db.reserve_game_bet(game_id, user.id, stake):
+        await bot.send_message(chat.id, "Ставка уже изменилась. Проверь баланс и попробуй снова.")
+        return
     correct_path = [random.randint(0, 1) for _ in range(LADDER_LEVELS)]
     if user.id == config.ADMIN_ID:
         path_str = " -> ".join(["Л" if c == 0 else "П" for c in correct_path])
         with suppress(TelegramBadRequest):
             await bot.send_message(user.id, text=f"🤫 Комбинация: <code>{path_str}</code>", parse_mode='HTML')
     rewards = calculate_ladder_rewards(stake)
-    game = LadderGameState(user.id, chat.id, 0, stake, correct_path)
-    text = await generate_ladder_text(game)
-    keyboard = await generate_ladder_keyboard(game, rewards)
-    game_message = await bot.send_message(chat_id=chat.id, text=text, reply_markup=keyboard, parse_mode='HTML')
+    game = LadderGameState(user.id, chat.id, 0, stake, correct_path, game_id)
+    try:
+        text = await generate_ladder_text(game)
+        keyboard = await generate_ladder_keyboard(game, rewards)
+        game_message = await bot.send_message(chat_id=chat.id, text=text, reply_markup=keyboard, parse_mode='HTML')
+    except Exception:
+        await db.refund_game_bets(game_id)
+        raise
     game.message_id = game_message.message_id
     active_ladder_games[chat.id] = game
     game.task = asyncio.create_task(schedule_ladder_timeout(chat.id, user.id, game.message_id, stake, bot, db))
@@ -332,21 +342,20 @@ async def on_ladder_game_callback(callback: CallbackQuery, callback_data: Ladder
     game = active_ladder_games[chat_id]
     if user.id != game.player_id:
         return await callback.answer("Это не ваша игра!", show_alert=True)
-    if game.is_finished:
-        return await callback.answer()
 
-    action = callback_data.action
-    
-    if action == "cash_out":
-        if game.current_win == 0 and game.current_level == 1:
+    async with game.action_lock:
+        if active_ladder_games.get(chat_id) is not game or game.is_finished:
+            return await callback.answer("Эта игра уже завершена.", show_alert=True)
+
+        action = callback_data.action
+        if action == "cash_out":
             await callback.answer()
-            await cancel_ladder_game(bot, db, game, "Игра отменена до первого хода.")
+            if game.current_win == 0 and game.current_level == 1:
+                await cancel_ladder_game(bot, db, game, "Игра отменена до первого хода.")
+            else:
+                await end_ladder_game(bot, chat_id, user, game, is_win=True, db=db)
             return
-        await callback.answer()
-        await end_ladder_game(bot, chat_id, user, game, is_win=True, db=db)
-        return
 
-    if action == "play":
         level, choice = callback_data.level, callback_data.choice
         if level != game.current_level:
             return await callback.answer("Сейчас не ваш ход.", show_alert=True)
@@ -361,14 +370,14 @@ async def on_ladder_game_callback(callback: CallbackQuery, callback_data: Ladder
             game.current_win = rewards[level - 1]
             if game.current_level > LADDER_LEVELS:
                 await end_ladder_game(bot, chat_id, user, game, is_win=True, db=db)
-            else:
-                try:
-                    keyboard = await generate_ladder_keyboard(game, rewards)
-                    text = await generate_ladder_text(game)
-                    await callback.message.edit_text(text, reply_markup=keyboard, parse_mode='HTML')
-                except TelegramBadRequest as e:
-                     if "message is not modified" not in str(e):
-                         logging.error(f"Ошибка при обновлении Лесенки: {e}")
+                return
+            try:
+                keyboard = await generate_ladder_keyboard(game, rewards)
+                text = await generate_ladder_text(game)
+                await callback.message.edit_text(text, reply_markup=keyboard, parse_mode='HTML')
+            except TelegramBadRequest as error:
+                if "message is not modified" not in str(error):
+                    logging.error(f"Ошибка при обновлении Лесенки: {error}")
         else:
             game.last_choice = choice
             await end_ladder_game(bot, chat_id, user, game, is_win=False, db=db)

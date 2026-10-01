@@ -57,6 +57,14 @@ class Database:
                 )
             ''')
             await db.execute('CREATE TABLE IF NOT EXISTS game_data (key TEXT PRIMARY KEY, value INTEGER)')
+            await db.execute('''
+                CREATE TABLE IF NOT EXISTS pending_game_bets (
+                    game_id TEXT NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    amount INTEGER NOT NULL CHECK(amount > 0),
+                    PRIMARY KEY (game_id, user_id)
+                )
+            ''')
             # --- ТАБЛИЦЫ ФЕРМЫ ---
             await db.execute('''
                 CREATE TABLE IF NOT EXISTS user_farm_data (
@@ -339,6 +347,7 @@ class Database:
     async def change_rating(self, user_id: int, amount: int):
         """Изменяет рейтинг пользователя на amount (может быть отрицательным)."""
         async with aiosqlite.connect(self.db_name) as db:
+            await db.execute("BEGIN IMMEDIATE")
             # Получаем текущий рейтинг
             cursor = await db.execute("SELECT beer_rating, max_beer_rating FROM users WHERE user_id = ?", (user_id,))
             row = await cursor.fetchone()
@@ -355,6 +364,129 @@ class Database:
             )
             await db.commit()
             return new_rating
+
+    async def reserve_game_bet(self, game_id: str, user_id: int, amount: int) -> bool:
+        """Atomically reserves a bet and prevents duplicate participation in one game."""
+        if amount <= 0:
+            return False
+
+        async with aiosqlite.connect(self.db_name) as db:
+            try:
+                await db.execute("BEGIN IMMEDIATE")
+                cursor = await db.execute(
+                    "SELECT beer_rating FROM users WHERE user_id = ?", (user_id,)
+                )
+                row = await cursor.fetchone()
+                if not row or row[0] < amount:
+                    await db.rollback()
+                    return False
+
+                await db.execute(
+                    "INSERT INTO pending_game_bets (game_id, user_id, amount) VALUES (?, ?, ?)",
+                    (game_id, user_id, amount),
+                )
+                await db.execute(
+                    "UPDATE users SET beer_rating = beer_rating - ? WHERE user_id = ?",
+                    (amount, user_id),
+                )
+                await db.commit()
+                return True
+            except aiosqlite.IntegrityError:
+                await db.rollback()
+                return False
+
+    async def refund_game_bets(self, game_id: str) -> int:
+        """Returns every reserved bet for a game exactly once."""
+        async with aiosqlite.connect(self.db_name) as db:
+            await db.execute("BEGIN IMMEDIATE")
+            cursor = await db.execute(
+                "SELECT user_id, amount FROM pending_game_bets WHERE game_id = ?", (game_id,)
+            )
+            bets = await cursor.fetchall()
+            for user_id, amount in bets:
+                await db.execute(
+                    "UPDATE users SET beer_rating = beer_rating + ?, max_beer_rating = MAX(max_beer_rating, beer_rating + ?) WHERE user_id = ?",
+                    (amount, amount, user_id),
+                )
+            await db.execute("DELETE FROM pending_game_bets WHERE game_id = ?", (game_id,))
+            await db.commit()
+            return len(bets)
+
+    async def refund_game_bet(self, game_id: str, user_id: int) -> bool:
+        """Returns one player's reserved bet without touching other participants."""
+        async with aiosqlite.connect(self.db_name) as db:
+            await db.execute("BEGIN IMMEDIATE")
+            cursor = await db.execute(
+                "SELECT amount FROM pending_game_bets WHERE game_id = ? AND user_id = ?",
+                (game_id, user_id),
+            )
+            row = await cursor.fetchone()
+            if not row:
+                await db.rollback()
+                return False
+            amount = row[0]
+            await db.execute(
+                "UPDATE users SET beer_rating = beer_rating + ?, max_beer_rating = MAX(max_beer_rating, beer_rating + ?) WHERE user_id = ?",
+                (amount, amount, user_id),
+            )
+            await db.execute(
+                "DELETE FROM pending_game_bets WHERE game_id = ? AND user_id = ?",
+                (game_id, user_id),
+            )
+            await db.commit()
+            return True
+
+    async def settle_game_bets(self, game_id: str, payouts: dict[int, int]) -> None:
+        """Closes reserved bets and credits the declared payouts in one transaction."""
+        async with aiosqlite.connect(self.db_name) as db:
+            await db.execute("BEGIN IMMEDIATE")
+            for user_id, amount in payouts.items():
+                if amount <= 0:
+                    continue
+                await db.execute(
+                    "UPDATE users SET beer_rating = beer_rating + ?, max_beer_rating = MAX(max_beer_rating, beer_rating + ?) WHERE user_id = ?",
+                    (amount, amount, user_id),
+                )
+            await db.execute("DELETE FROM pending_game_bets WHERE game_id = ?", (game_id,))
+            await db.commit()
+
+    async def recover_pending_game_bets(self) -> int:
+        """Returns bets left behind by an unexpected bot restart."""
+        async with aiosqlite.connect(self.db_name) as db:
+            await db.execute("BEGIN IMMEDIATE")
+            cursor = await db.execute("SELECT user_id, amount FROM pending_game_bets")
+            bets = await cursor.fetchall()
+            for user_id, amount in bets:
+                await db.execute(
+                    "UPDATE users SET beer_rating = beer_rating + ?, max_beer_rating = MAX(max_beer_rating, beer_rating + ?) WHERE user_id = ?",
+                    (amount, amount, user_id),
+                )
+            await db.execute("DELETE FROM pending_game_bets")
+            await db.commit()
+            return len(bets)
+
+    async def claim_beer_cooldown(self, user_id: int, cooldown_seconds: int) -> int:
+        """Claims the /beer cooldown. Returns remaining seconds, or zero on success."""
+        now = datetime.now()
+        async with aiosqlite.connect(self.db_name) as db:
+            await db.execute("BEGIN IMMEDIATE")
+            cursor = await db.execute(
+                "SELECT last_beer_time FROM users WHERE user_id = ?", (user_id,)
+            )
+            row = await cursor.fetchone()
+            if row and row[0]:
+                last_time = datetime.fromisoformat(row[0])
+                elapsed = (now - last_time).total_seconds()
+                if elapsed < cooldown_seconds:
+                    await db.rollback()
+                    return max(1, int(cooldown_seconds - elapsed))
+
+            await db.execute(
+                "UPDATE users SET last_beer_time = ? WHERE user_id = ?",
+                (now.isoformat(), user_id),
+            )
+            await db.commit()
+            return 0
 
     async def update_last_beer_time(self, user_id: int):
         """Обновляет время последнего использования /beer."""
@@ -541,8 +673,35 @@ class Database:
         await self.update_setting("jackpot_value", 0)
 
     async def increase_jackpot(self, amount: int):
-        current = await self.get_jackpot()
-        await self.update_setting("jackpot_value", current + amount)
+        if amount <= 0:
+            return
+        async with aiosqlite.connect(self.db_name) as db:
+            await db.execute(
+                """
+                INSERT INTO game_data (key, value) VALUES ('jackpot_value', ?)
+                ON CONFLICT(key) DO UPDATE SET value = value + excluded.value
+                """,
+                (amount,),
+            )
+            await db.commit()
+
+    async def claim_jackpot(self, user_id: int) -> int:
+        """Atomically transfers the global jackpot to one player."""
+        async with aiosqlite.connect(self.db_name) as db:
+            await db.execute("BEGIN IMMEDIATE")
+            cursor = await db.execute("SELECT value FROM game_data WHERE key = 'jackpot_value'")
+            row = await cursor.fetchone()
+            amount = row[0] if row else 0
+            if amount <= 0:
+                await db.rollback()
+                return 0
+            await db.execute("UPDATE game_data SET value = 0 WHERE key = 'jackpot_value'")
+            await db.execute(
+                "UPDATE users SET beer_rating = beer_rating + ?, max_beer_rating = MAX(max_beer_rating, beer_rating + ?) WHERE user_id = ?",
+                (amount, amount, user_id),
+            )
+            await db.commit()
+            return amount
     # --- 🕵️ МАФИЯ (ВОССТАНОВЛЕНЫ) ---
     
     async def get_mafia_game(self, chat_id: int):

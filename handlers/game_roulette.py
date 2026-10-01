@@ -4,6 +4,7 @@ import random
 from datetime import datetime, timedelta
 from contextlib import suppress
 import logging
+from uuid import uuid4
 
 from aiogram import Router, Bot
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
@@ -25,13 +26,15 @@ class RouletteCallbackData(CallbackData, prefix="roulette"):
 
 # --- КЛАССЫ И КОНСТАНТЫ ---
 class GameState:
-    def __init__(self, creator, stake, max_players, lobby_message_id):
+    def __init__(self, creator, stake, max_players, lobby_message_id, game_id):
         self.creator = creator
         self.stake = stake
         self.max_players = max_players
         self.lobby_message_id = lobby_message_id
+        self.game_id = game_id
         self.players = {creator.id: creator}
         self.task = None
+        self.action_lock = asyncio.Lock()
 
 ROULETTE_LOBBY_TIMEOUT_SECONDS = 60
 active_games = {}
@@ -254,11 +257,26 @@ async def cmd_roulette(message: Message, bot: Bot, db: Database, settings: Setti
             parse_mode='HTML'
         )
     
-    await db.change_rating(creator.id, -stake)
-    lobby_message = await message.reply("🎰 Крупье ставит кружки на стойку...")
-    game = GameState(creator, stake, max_players, lobby_message.message_id)
+    game_id = f"roulette:{chat_id}:{creator.id}:{uuid4().hex}"
+    if not await db.reserve_game_bet(game_id, creator.id, stake):
+        return await message.reply("Ставка уже изменилась. Проверь баланс и попробуй снова.")
+    try:
+        lobby_message = await message.reply("🎰 Крупье ставит кружки на стойку...")
+    except Exception:
+        await db.refund_game_bets(game_id)
+        raise
+    game = GameState(creator, stake, max_players, lobby_message.message_id, game_id)
     active_games[chat_id] = game
-    await lobby_message.edit_text(await generate_lobby_text(game), reply_markup=get_roulette_keyboard(game), parse_mode='HTML')
+    try:
+        await lobby_message.edit_text(
+            await generate_lobby_text(game),
+            reply_markup=get_roulette_keyboard(game),
+            parse_mode='HTML',
+        )
+    except Exception:
+        await db.refund_game_bets(game_id)
+        del active_games[chat_id]
+        raise
     game.task = asyncio.create_task(schedule_game_start(chat_id, bot, db))
 
 @roulette_router.callback_query(RouletteCallbackData.filter())
@@ -268,42 +286,61 @@ async def on_roulette_button_click(callback: CallbackQuery, callback_data: Roule
     if chat_id not in active_games: return await callback.answer("Эта игра уже неактивна.", show_alert=True)
     
     game = active_games[chat_id]
-    action = callback_data.action
-    
-    if action == "join":
-        if user.id in game.players: return await callback.answer("Вы уже в игре!", show_alert=True)
-        if len(game.players) >= game.max_players: return await callback.answer("Лобби заполнено.", show_alert=True)
-        if not await check_user_registered(callback, bot, db): return
-        balance = await db.get_user_beer_rating(user.id)
-        if balance < game.stake: return await callback.answer(f"Недостаточно пива! Нужно {game.stake} 🍺, у вас {balance} 🍺.", show_alert=True)
-        await db.change_rating(user.id, -game.stake)
-        game.players[user.id] = user
-        await callback.answer("Ты занял место у стойки.")
-        if len(game.players) == game.max_players:
-            if game.task: game.task.cancel()
-            await start_roulette_game(chat_id, bot, db)
-        else:
-            await callback.message.edit_text(await generate_lobby_text(game), reply_markup=get_roulette_keyboard(game), parse_mode='HTML')
-            
-    elif action == "leave":
-        if user.id not in game.players: return await callback.answer("Вы не в этой игре.", show_alert=True)
-        if user.id == game.creator.id: return await callback.answer("Создатель не может покинуть игру. Только отменить.", show_alert=True)
-        del game.players[user.id]
-        await db.change_rating(user.id, game.stake)
-        await callback.answer("Ты вышел из лобби. Ставка возвращена.", show_alert=True)
-        await callback.message.edit_text(await generate_lobby_text(game), reply_markup=get_roulette_keyboard(game), parse_mode='HTML')
-        
-    elif action == "cancel":
-        if user.id != game.creator.id: return await callback.answer("Только создатель может отменить игру.", show_alert=True)
-        if game.task: game.task.cancel()
-        for player_id in game.players: await db.change_rating(player_id, game.stake)
-        del active_games[chat_id]
-        with suppress(TelegramBadRequest): await bot.unpin_chat_message(chat_id=chat_id, message_id=game.lobby_message_id)
-        await callback.message.edit_text(
-            get_roulette_cancel_text("Создатель закрыл лобби до старта."),
-            parse_mode='HTML'
-        )
-        await callback.answer()
+    async with game.action_lock:
+        if active_games.get(chat_id) is not game:
+            return await callback.answer("Эта игра уже неактивна.", show_alert=True)
+
+        action = callback_data.action
+        if action == "join":
+            if user.id in game.players:
+                return await callback.answer("Вы уже в игре!", show_alert=True)
+            if len(game.players) >= game.max_players:
+                return await callback.answer("Лобби заполнено.", show_alert=True)
+            if not await check_user_registered(callback, bot, db):
+                return
+            if not await db.reserve_game_bet(game.game_id, user.id, game.stake):
+                return await callback.answer("Ставка уже изменилась. Проверь баланс.", show_alert=True)
+            game.players[user.id] = user
+            await callback.answer("Ты занял место у стойки.")
+            if len(game.players) == game.max_players:
+                if game.task:
+                    game.task.cancel()
+                await start_roulette_game(chat_id, bot, db)
+            else:
+                await callback.message.edit_text(
+                    await generate_lobby_text(game),
+                    reply_markup=get_roulette_keyboard(game),
+                    parse_mode='HTML',
+                )
+
+        elif action == "leave":
+            if user.id not in game.players:
+                return await callback.answer("Вы не в этой игре.", show_alert=True)
+            if user.id == game.creator.id:
+                return await callback.answer("Создатель не может покинуть игру. Только отменить.", show_alert=True)
+            del game.players[user.id]
+            await db.refund_game_bet(game.game_id, user.id)
+            await callback.answer("Ты вышел из лобби. Ставка возвращена.", show_alert=True)
+            await callback.message.edit_text(
+                await generate_lobby_text(game),
+                reply_markup=get_roulette_keyboard(game),
+                parse_mode='HTML',
+            )
+
+        elif action == "cancel":
+            if user.id != game.creator.id:
+                return await callback.answer("Только создатель может отменить игру.", show_alert=True)
+            if game.task:
+                game.task.cancel()
+            await db.refund_game_bets(game.game_id)
+            del active_games[chat_id]
+            with suppress(TelegramBadRequest):
+                await bot.unpin_chat_message(chat_id=chat_id, message_id=game.lobby_message_id)
+            await callback.message.edit_text(
+                get_roulette_cancel_text("Создатель закрыл лобби до старта."),
+                parse_mode='HTML',
+            )
+            await callback.answer()
 
 async def schedule_game_start(chat_id: int, bot: Bot, db: Database):
     try:
@@ -313,7 +350,7 @@ async def schedule_game_start(chat_id: int, bot: Bot, db: Database):
         if len(game.players) >= 2:
             await start_roulette_game(chat_id, bot, db)
         else:
-            await db.change_rating(game.creator.id, game.stake)
+            await db.refund_game_bets(game.game_id)
             await bot.edit_message_text(
                 text=get_roulette_cancel_text("Недостаточно игроков. Барабан остался на полке."),
                 chat_id=chat_id,
@@ -329,7 +366,8 @@ async def schedule_game_start(chat_id: int, bot: Bot, db: Database):
     except Exception as e:
         logging.error(f"Ошибка в schedule_game_start: {e}")
         if chat_id in active_games:
-            del active_games[chat_id]
+            game = active_games.pop(chat_id)
+            await db.refund_game_bets(game.game_id)
 
 async def start_roulette_game(chat_id: int, bot: Bot, db: Database):
     if chat_id not in active_games: return
@@ -369,7 +407,7 @@ async def start_roulette_game(chat_id: int, bot: Bot, db: Database):
         await asyncio.sleep(7)
     winner = players_in_game[0]
     prize = game.stake * len(game.players)
-    await db.change_rating(winner.id, prize)
+    await db.settle_game_bets(game.game_id, {winner.id: prize})
     participants_text = "\n".join(
         f"• {'🏆 ' if player.id == winner.id else ''}{mention_user(player.id, player.full_name)}"
         for player in game.players.values()

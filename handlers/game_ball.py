@@ -1,5 +1,6 @@
 import asyncio
 import re
+from uuid import uuid4
 from decimal import Decimal, ROUND_HALF_UP
 
 from aiogram import Bot, Router
@@ -112,14 +113,17 @@ async def play_ball(message: Message, bot: Bot, db: Database, stake: int):
         )
         return
 
-    await db.change_rating(user.id, -stake)
+    game_id = f"ball:{message.chat.id}:{user.id}:{uuid4().hex}"
+    if not await db.reserve_game_bet(game_id, user.id, stake):
+        await message.reply("Ставка уже изменилась. Проверь баланс и попробуй снова.")
+        return
     try:
         dice_message = await bot.send_dice(
             chat_id=message.chat.id,
             emoji=BALL_EMOJI,
         )
     except Exception:
-        await db.change_rating(user.id, stake)
+        await db.refund_game_bets(game_id)
         await message.reply(
             f"{BALL_EMOJI} \u041d\u0435 \u043f\u043e\u043b\u0443\u0447\u0438\u043b\u043e\u0441\u044c \u0431\u0440\u043e\u0441\u0438\u0442\u044c \u043c\u044f\u0447. "
             "\u0421\u0442\u0430\u0432\u043a\u0430 \u0432\u043e\u0437\u0432\u0440\u0430\u0449\u0435\u043d\u0430.",
@@ -135,7 +139,7 @@ async def play_ball(message: Message, bot: Bot, db: Database, stake: int):
     if dice_value in BALL_HIT_VALUES:
         prize = get_ball_win(stake)
         profit = prize - stake
-        await db.change_rating(user.id, prize)
+        await db.settle_game_bets(game_id, {user.id: prize})
         text = (
             f"{BALL_EMOJI} <b>\u041f\u043e\u043f\u0430\u043b \u0432 \u043a\u043e\u043b\u044c\u0446\u043e!</b>\n\n"
             f"{player} \u0437\u0430\u0431\u0438\u0440\u0430\u0435\u0442 <b>{prize}</b> {BEER_EMOJI}\n"
@@ -144,6 +148,7 @@ async def play_ball(message: Message, bot: Bot, db: Database, stake: int):
             f"\u041c\u043d\u043e\u0436\u0438\u0442\u0435\u043b\u044c: <b>x{BALL_MULTIPLIER}</b>"
         )
     else:
+        await db.settle_game_bets(game_id, {})
         text = (
             f"{BALL_EMOJI} <b>\u041c\u0438\u043c\u043e \u043a\u043e\u043b\u044c\u0446\u0430</b>\n\n"
             f"{player} \u0442\u0435\u0440\u044f\u0435\u0442 \u0441\u0442\u0430\u0432\u043a\u0443 <b>{stake}</b> {BEER_EMOJI}\n\n"

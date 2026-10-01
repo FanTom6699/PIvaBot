@@ -72,22 +72,18 @@ BEER_JACKPOT_LINES = [
 
 async def run_beer_attempt(user_id: int, db: Database, settings: SettingsManager) -> dict[str, Any]:
     cooldown_seconds = settings.beer_cooldown
-    last_beer_time = await db.get_last_beer_time(user_id)
-
-    if last_beer_time:
-        time_passed = datetime.now() - last_beer_time
-        if time_passed.total_seconds() < cooldown_seconds:
-            time_left = timedelta(seconds=cooldown_seconds) - time_passed
-            return {
-                "text": (
-                    "⏳ <b>Бар на паузе</b>\n\n"
-                    f"{random.choice(BEER_COOLDOWN_LINES)}\n\n"
-                    f"{DIVIDER}\n"
-                    f"Осталось: <b>{format_time_delta(time_left)}</b>"
-                ),
-                "jackpot_text": None,
-                "spam": False,
-            }
+    seconds_left = await db.claim_beer_cooldown(user_id, cooldown_seconds)
+    if seconds_left:
+        return {
+            "text": (
+                "⏳ <b>Бар на паузе</b>\n\n"
+                f"{random.choice(BEER_COOLDOWN_LINES)}\n\n"
+                f"{DIVIDER}\n"
+                f"Осталось: <b>{format_time_delta(timedelta(seconds=seconds_left))}</b>"
+            ),
+            "jackpot_text": None,
+            "spam": False,
+        }
 
     now = datetime.now()
     if user_id in user_spam_tracker:
@@ -131,14 +127,10 @@ async def run_beer_attempt(user_id: int, db: Database, settings: SettingsManager
         if rating_change < 0:
             await db.increase_jackpot(abs(rating_change))
 
-    await db.update_last_beer_time(user_id)
-
     jackpot_text = None
     if random.randint(1, settings.jackpot_chance) == 1:
-        current_jackpot = await db.get_jackpot()
+        current_jackpot = await db.claim_jackpot(user_id)
         if current_jackpot > 0:
-            await db.reset_jackpot()
-            await db.change_rating(user_id, current_jackpot)
             jackpot_text = (
                 f"🎉 <b>Джекпот</b>\n\n"
                 f"{random.choice(BEER_JACKPOT_LINES)}\n\n"

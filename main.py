@@ -114,6 +114,9 @@ async def main():
     settings_manager = SettingsManager()
 
     await db.initialize()
+    recovered_bets = await db.recover_pending_game_bets()
+    if recovered_bets:
+        logging.warning("Returned %s unfinished game bet(s) after restart", recovered_bets)
     await settings_manager.load_settings(db)
 
     # Бот
